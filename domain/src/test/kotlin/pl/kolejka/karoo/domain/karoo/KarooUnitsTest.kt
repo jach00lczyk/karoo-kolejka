@@ -26,10 +26,12 @@ class KarooUnitsTest {
     }
 
     @Test
-    fun `distance in meters with sanity against route length`() {
-        assertEquals(107_065.66, KarooUnits.distanceM(107_065.66, 107_915.68)!!, 0.01)
-        assertNull(KarooUnits.distanceM(500_000.0, 68_000.0))
-        assertNull(KarooUnits.distanceM(-1.0, 68_000.0))
+    fun `distance in meters, may exceed route length when far from route`() {
+        assertEquals(107_065.66, KarooUnits.distanceM(107_065.66)!!, 0.01)
+        assertEquals(77_945.6, KarooUnits.distanceM(77_945.6)!!, 0.01) // trasa 46 km, rowerzysta w domu
+        assertNull(KarooUnits.distanceM(2_000_000.0))
+        assertNull(KarooUnits.distanceM(-1.0))
+        assertNull(KarooUnits.distanceM(Double.NaN))
     }
 
     @Test

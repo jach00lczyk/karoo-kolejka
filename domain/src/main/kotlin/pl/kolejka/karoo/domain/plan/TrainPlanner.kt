@@ -173,6 +173,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
     fun alternativeOnRoute(geometry: RouteGeometry, routeDistanceM: Double, ctx: Ctx): Alternative? {
         val remaining = ctx.remainingM
         val current = (routeDistanceM - remaining).coerceAtLeast(0.0)
+        val offRoute = (remaining - routeDistanceM).coerceAtLeast(0.0)
         val secondsToFinish = Duration.between(ctx.now, ctx.eta.instant).seconds
         val v = if (secondsToFinish > 0 && remaining > 0) remaining / secondsToFinish else ctx.settings.fallbackSpeedKmh / 3.6
         return geometry.stationsOnRoute
@@ -180,7 +181,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
             .sortedByDescending { it.positionAhead(current) }
             .firstNotNullOfOrNull { s ->
                 val pos = s.positionAhead(current)
-                val etaStation = ctx.now.plusSeconds(((pos - current) / v).toLong())
+                val etaStation = ctx.now.plusSeconds(((pos - current + offRoute) / v).toLong())
                 val ready = etaStation
                     .plusSeconds((s.distanceFromRouteM / (ctx.settings.accessSpeedKmh / 3.6)).toLong())
                     .plus(Duration.ofMinutes(ctx.settings.bufferMin.toLong()))

@@ -100,4 +100,18 @@ class SiedlceRouteTest {
         // Ostatni pociąg dnia w oknie ma czerwony dopisek zamiast tekstu w linii
         assertTrue(tall.none { "OSTATNI" in it.text })
     }
+
+    @Test
+    fun `far from route start, station distances include the way to the route`() {
+        val g = RouteAnalyzer.analyze(route, SpatialIndex(timetable.stations), 1000.0, 1000.0)!!
+        val routeM = g.lengthM
+        val clock = Clock.fixed(at(13, 0), ZoneOffset.UTC)
+        val planner = TrainPlanner(timetable, clock)
+        // Karoo: 30 km więcej niż trasa — dojazd do startu trasy
+        val progress = RideProgress(remainingM = routeM + 30_000, karooEta = at(16, 0))
+        val eta = EtaEstimator.finishEta(clock.instant(), progress.karooEta, null, progress.remainingM, routeM, null, 25.0)
+        val up = UpcomingStations(planner, clock).compute(g, routeM, progress, eta, Settings(), targets, limit = 2)
+        val mrozy = up.first { it.station.name == "Mrozy" }
+        assertEquals(30_000 + mrozy.alongM, mrozy.distanceM, 1.0)
+    }
 }

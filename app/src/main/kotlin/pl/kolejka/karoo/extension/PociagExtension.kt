@@ -9,11 +9,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import pl.kolejka.karoo.BuildConfig
-import pl.kolejka.karoo.data.BundledTimetable
-import java.time.Clock
+import pl.kolejka.karoo.AppContainer
 import pl.kolejka.karoo.log.FileLog
-import pl.kolejka.karoo.probe.DeviceProbe
-import pl.kolejka.karoo.probe.ProbeDataType
+import java.time.Clock
 
 class PociagExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAME) {
 
@@ -25,10 +23,10 @@ class PociagExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAME) {
     )
 
     private val engine by lazy {
-        TileEngine(RealKarooSource(karoo), BundledTimetable.load(this), Clock.systemUTC(), scope)
+        TileEngine(RealKarooSource(karoo), AppContainer.timetable(this), Clock.systemUTC(), scope)
     }
 
-    override val types by lazy { listOf(TrainDataType(extension) { engine }, ProbeDataType(extension)) }
+    override val types by lazy { listOf(TrainDataType(extension) { engine }) }
 
     override fun onCreate() {
         super.onCreate()
@@ -36,7 +34,6 @@ class PociagExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAME) {
         karoo.connect { connected ->
             FileLog.i("KarooSystem connected=$connected libVersion=${karoo.libVersion} info=${karoo.info}")
         }
-        DeviceProbe(karoo, scope).start()
         if (BuildConfig.DEBUG) scope.launch { FileLog.i(engine.selfCheck("Siedlce")) }
     }
 

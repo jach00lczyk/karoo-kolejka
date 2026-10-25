@@ -20,12 +20,14 @@ object KarooUnits {
     fun etaFromTimeToDestination(raw: Double?, now: Instant): Instant? =
         if (raw == null || !raw.isFinite() || raw <= 0) null else now.plusMillis(raw.toLong())
 
-    /** Odrzucamy wartości większe niż trasa + zapas na objazd. */
-    fun distanceM(raw: Double?, routeDistanceM: Double): Double? = when {
-        raw == null || !raw.isFinite() || raw < 0 -> null
-        raw > routeDistanceM * 1.5 + 5_000 -> null
-        else -> raw
-    }
+    /**
+     * Dystans do mety może przekraczać długość trasy: gdy rowerzysta jest daleko od jej startu,
+     * Karoo wlicza dojazd do trasy (25.10: 78 km przy trasie 46 km). Odrzucamy tylko śmieci.
+     */
+    fun distanceM(raw: Double?): Double? =
+        if (raw == null || !raw.isFinite() || raw < 0 || raw > MAX_DISTANCE_M) null else raw
+
+    private const val MAX_DISTANCE_M = 1_000_000.0
 
     fun speedMps(raw: Double?): Double? =
         if (raw == null || !raw.isFinite() || raw < 0 || raw > MAX_SPEED_MPS) null else raw

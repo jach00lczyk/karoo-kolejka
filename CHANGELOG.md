@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Porządki po fazie 0 (2026-10-25)
+
+- Usunięta sonda diagnostyczna (subskrybowała wszystkie strumienie cały czas) i jej pole.
+- Ekran aplikacji: „O danych" (wersja i ważność rozkładu, źródła, ostatnie 200 linii logu,
+  odczyt jednorazowy bez pollingu) zamiast ekranu prób. `AppContainer` — jedna instancja
+  rozkładu na proces.
+- Dystans do mety nie jest już odrzucany, gdy przekracza długość trasy (dojazd do trasy);
+  dystans i ETA stacji po drodze uwzględniają ten dojazd.
+
 ### Po jeździe testowej (2026-10-25 wieczór)
 
 - Faza 0: jednostki ustalone (TIME_OF_ARRIVAL epoch ms, TIME_TO_DESTINATION ms, dystans m,

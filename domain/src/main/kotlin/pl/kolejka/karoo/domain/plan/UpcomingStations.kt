@@ -38,6 +38,8 @@ class UpcomingStations(private val planner: TrainPlanner, private val clock: Clo
         val now = clock.instant()
         val remaining = progress.remainingM?.takeIf { it.isFinite() && it >= 0 } ?: routeDistanceM
         val current = (routeDistanceM - remaining).coerceAtLeast(0.0)
+        // Poza trasą (przed jej startem) dystans do mety zawiera dojazd do trasy.
+        val offRoute = (remaining - routeDistanceM).coerceAtLeast(0.0)
         val toFinish = Duration.between(now, finishEta.instant).seconds
         val v = if (toFinish > 0 && remaining > 0) remaining / toFinish else settings.fallbackSpeedKmh / 3.6
         return geometry.stationsOnRoute
@@ -46,12 +48,13 @@ class UpcomingStations(private val planner: TrainPlanner, private val clock: Clo
             .take(limit)
             .map { s ->
                 val pos = s.positionAhead(current)
-                val eta = now.plusSeconds(((pos - current) / v).toLong())
+                val distance = pos - current + offRoute
+                val eta = now.plusSeconds((distance / v).toLong())
                 val ready = eta
                     .plusSeconds((s.distanceFromRouteM / (settings.accessSpeedKmh / 3.6)).toLong())
                     .plus(Duration.ofMinutes(settings.bufferMin.toLong()))
                 val train = planner.trainsFrom(s.station.id, ready, TrainPlanner.serviceDayEnd(ready), targets).firstOrNull()
-                UpcomingStation(s.station, pos, s.distanceFromRouteM, pos - current, eta, train)
+                UpcomingStation(s.station, pos, s.distanceFromRouteM, distance, eta, train)
             }
     }
 }

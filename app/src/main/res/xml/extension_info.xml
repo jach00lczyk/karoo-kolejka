@@ -10,11 +10,4 @@
         graphical="true"
         icon="@drawable/ic_train"
         typeId="pociag" />
-    <!-- Faza 0: pole diagnostyczne, do usunięcia po pomiarach. -->
-    <DataType
-        description="@string/probe_description"
-        displayName="@string/probe_name"
-        graphical="true"
-        icon="@drawable/ic_train"
-        typeId="probe" />
 </ExtensionInfo>

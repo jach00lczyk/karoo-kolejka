@@ -59,6 +59,13 @@ Procedura:
 
 ## C. Inne obserwacje
 
+- **`DISTANCE_TO_DESTINATION` może być większy niż `routeDistance`:** z dala od trasy Karoo
+  wlicza dojazd do niej (25.10: 78 km przy trasie 46 km). Dystanse do stacji po drodze liczymy
+  wtedy jako dojazd do trasy + pozycja stacji na trasie.
+- Sonda z fazy 0 (`DeviceProbe`, pole „Pociąg: diagnostyka", ekran prób) została usunięta
+  po zakończeniu pomiarów; jest w historii gita (commit `a714b7e`), gdyby trzeba było coś
+  zmierzyć ponownie.
+
 - **Aplikacja i rozszerzenie dzielą jeden proces.** Wyjątek w coroutine ekranu (`first()` na
   pustym flow po `RESPONSE_TOO_LARGE`) zabił też serwis rozszerzenia; Karoo uruchomiło go ponownie
   po ~6–10 s. Każdy scope UI i serwisu musi mieć `CoroutineExceptionHandler`. W sondzie poprawione.

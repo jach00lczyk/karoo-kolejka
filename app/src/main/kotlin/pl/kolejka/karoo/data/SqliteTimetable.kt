@@ -24,6 +24,9 @@ class SqliteTimetable private constructor(private val db: SQLiteDatabase) : Time
 
     override val version: String = meta["feed_version"].orEmpty()
 
+    /** Atrybucja źródeł do pokazania w „O danych" (SPEC 3.5). */
+    val attribution: String = meta["source_attribution"].orEmpty()
+
     override val stations: List<Station> = db.rawQuery(
         "SELECT id, name, name_norm, lat, lon, agencies, group_id FROM station", null,
     ).use { c ->

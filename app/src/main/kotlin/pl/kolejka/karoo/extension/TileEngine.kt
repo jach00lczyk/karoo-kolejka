@@ -137,7 +137,7 @@ class TileEngine(
     private fun compute(rs: RouteState.Ready, raw: RawStreams): TileModel = try {
         val now = clock.instant()
         val routeDistance = (rs.input as? NavInput.Route)?.routeDistanceM ?: rs.geometry.lengthM
-        val remaining = KarooUnits.distanceM(raw.distanceToDestination, routeDistance)
+        val remaining = KarooUnits.distanceM(raw.distanceToDestination)
         val karooEta = KarooUnits.etaFromTimeOfArrival(raw.timeOfArrival)
             ?: KarooUnits.etaFromTimeToDestination(raw.timeToDestination, now)
         if (karooEta != null) lastKarooEta = KarooEtaSample(karooEta, now)
