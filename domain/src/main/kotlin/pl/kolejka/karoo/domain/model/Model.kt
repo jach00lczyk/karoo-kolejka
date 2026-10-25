@@ -80,4 +80,16 @@ data class Settings(
     val strictToleranceMin: Int = 30,
     val tileClickable: Boolean = true,
     val notifications: Boolean = true,
-)
+    /** Grupy stacji docelowych (SPEC 6.1); null = domyślne z rozkładu (`meta.default_targets`). */
+    val targets: List<Set<Int>>? = null,
+) {
+    companion object {
+        /** „36103|37440|33571,14357927" ↔ [[36103],[37440],[33571,14357927]]. */
+        fun encodeTargets(t: List<Set<Int>>): String = t.joinToString("|") { it.joinToString(",") }
+
+        fun decodeTargets(s: String): List<Set<Int>>? =
+            s.split('|').map { g -> g.split(',').mapNotNull { it.trim().toIntOrNull() }.toSet() }
+                .filter { it.isNotEmpty() }
+                .takeIf { it.isNotEmpty() }
+    }
+}

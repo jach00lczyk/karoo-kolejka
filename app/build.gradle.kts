@@ -13,8 +13,10 @@ android {
         applicationId = "pl.kolejka.karoo"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+        // Rozkład publikowany przez .github/workflows/timetable.yml na GitHub Pages (SPEC 1.2).
+        buildConfigField("String", "MANIFEST_URL", "\"https://jach00lczyk.github.io/karoo-kolejka/manifest.json\"")
     }
 
     buildTypes {
@@ -54,6 +56,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
 }

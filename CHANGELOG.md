@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Faza 2 — Dane na Androidzie (2026-10-25)
+
+- `TimetableUpdater` (domena, czysty Kotlin): manifest z GitHub Pages, sprawdzanie najwyżej co
+  6 h (chyba że wymuszone), pobranie → sha256 → rozpakowanie → walidacja → atomowa podmiana,
+  poprzednia wersja zostaje jako zapas, 2 ponowienia z backoffem, odkładanie pobierania w
+  trakcie jazdy bez Wi-Fi (gdy są już jakieś dane). 10 testów JVM.
+- Android: manifest najpierw przez Karoo HTTP (działa przez mostek z telefonem), potem
+  bezpośrednio; plik danych tylko bezpośrednio (`OnHttpResponse` ma limit 100 KB). Walidacja:
+  `PRAGMA integrity_check` + `schema_version`.
+- Wyzwalacze bez timerów: start serwisu (raz), koniec jazdy (gdy było odłożone), przycisk
+  „Sprawdź aktualizację" w „O danych". Kafel i aplikacja przełączają się na nowy rozkład bez
+  restartu (`AppContainer.timetable` jako StateFlow; stara baza zamykana po 60 s).
+- Build debug zasiewa dane z wbudowanego pliku przy pierwszym uruchomieniu; release zaczyna od
+  „Brak rozkładu" do pierwszego pobrania (SPEC 9.4).
+- Ustawienia w DataStore (`SettingsRepository`), w tym lista grup stacji docelowych; kafel
+  przelicza się po zmianie. Ekran ustawień — faza 6. **Nowa zależność:**
+  `androidx.datastore:datastore-preferences` (SPEC 1.6).
+- Dystans do mety przytrzymywany 2 min, gdy Karoo chwilowo go nie podaje — kafel przeskakiwał
+  między dystansem z Karoo a długością trasy.
+- Wersja aplikacji 0.2.0.
+- Sprawdzone na Karoo 3: bez sieci — zasiew z assets, 3 nieudane próby, kafel działa dalej;
+  z Wi-Fi — manifest przez Karoo HTTP, pobranie i podmiana w 2,6 s, kafel przeliczony na nowym
+  rozkładzie bez restartu, poprzednia wersja zachowana jako zapas.
+
 ### Porządki po fazie 0 (2026-10-25)
 
 - Usunięta sonda diagnostyczna (subskrybowała wszystkie strumienie cały czas) i jej pole.

@@ -4,6 +4,7 @@ import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.OnNavigationState.NavigationState
+import io.hammerhead.karooext.models.RideState
 import io.hammerhead.karooext.models.StreamState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +35,9 @@ interface KarooSource {
     /** Stan nawigacji z obejściem P1 (ponowna subskrypcja). */
     val navigation: Flow<NavInput>
     fun stream(dataTypeId: String): Flow<StreamState>
+
+    /** Czy trwa nagrywanie jazdy (pauza też się liczy jako jazda). */
+    val recording: Flow<Boolean>
 }
 
 class RealKarooSource(private val karoo: KarooSystemService) : KarooSource {
@@ -60,6 +64,8 @@ class RealKarooSource(private val karoo: KarooSystemService) : KarooSource {
     }
 
     override fun stream(dataTypeId: String): Flow<StreamState> = karoo.streamDataFlow(dataTypeId)
+
+    override val recording: Flow<Boolean> = karoo.consumerFlow<RideState>().map { it !is RideState.Idle }
 
     private fun NavigationState.toNavInput(): NavInput = when (this) {
         NavigationState.Idle -> NavInput.Idle

@@ -12,8 +12,15 @@
     <string name="about_valid_to">Ważny do: %1$s</string>
     <string name="about_stations">Stacji: %1$d</string>
     <string name="about_missing">Brak rozkładu</string>
-    <string name="about_hint">Dodaj pole „Pociąg do Warszawy” do strony profilu jazdy. Zakładki z odjazdami i ustawienia pojawią się w kolejnych wersjach.</string>
+    <string name="about_hint">Dodaj pole „Pociąg do Warszawy” do strony profilu jazdy. Rozkład aktualizuje się sam przy starcie Karoo. Zakładki z odjazdami i ustawienia pojawią się w kolejnych wersjach.</string>
     <string name="about_sources">Źródła danych</string>
     <string name="about_log">Log (ostatnie wpisy)</string>
     <string name="about_refresh">Odśwież</string>
+    <string name="about_version">Wersja: %1$s</string>
+    <string name="about_check">Sprawdź aktualizację</string>
+    <string name="about_checking">Sprawdzam…</string>
+    <string name="update_updated">Pobrano nowy rozkład (%1$s)</string>
+    <string name="update_up_to_date">Rozkład jest aktualny</string>
+    <string name="update_deferred">Nowy rozkład pobiorę po zakończeniu jazdy</string>
+    <string name="update_failed">Nie udało się: %1$s</string>
 </resources>

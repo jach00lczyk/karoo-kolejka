@@ -24,6 +24,9 @@ class SqliteTimetable private constructor(private val db: SQLiteDatabase) : Time
 
     override val version: String = meta["feed_version"].orEmpty()
 
+    /** Identyfikator danych (czas generacji) — do zasiewu i logów. */
+    val dataVersion: String = meta["generated_at"].orEmpty()
+
     /** Atrybucja źródeł do pokazania w „O danych" (SPEC 3.5). */
     val attribution: String = meta["source_attribution"].orEmpty()
 
@@ -86,6 +89,9 @@ class SqliteTimetable private constructor(private val db: SQLiteDatabase) : Time
             }
         }
     }
+
+    /** Wywoływane po podmianie na nowszą wersję (z opóźnieniem, by nie przerwać trwającego zapytania). */
+    fun close() = db.close()
 
     private fun android.database.Cursor.getStringOrNull(i: Int): String? = if (isNull(i)) null else getString(i)
 
