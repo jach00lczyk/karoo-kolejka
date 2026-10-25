@@ -33,6 +33,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    androidResources {
+        noCompress += "sqlite" // plik rozkładu kopiowany 1:1, rozmiar sprawdzalny przez openFd
+    }
     buildFeatures {
         compose = true
         buildConfig = true

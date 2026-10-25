@@ -1,7 +1,7 @@
 # Faza 0 — ustalenia z urządzenia
 
 > Dalsze fazy opierają się na tym pliku, nie na zgadywaniu (SPEC 4.1, 12).
-> Status: **pomiary w toku** (Karoo 3, ext lib 1.1.9). Testy w domu bez GPS-u zrobione 24.10; jazda z GPS-em jeszcze nie.
+> Status: **pomiary w toku** (Karoo 3, ext lib 1.1.9). Testy w domu 24.10, jazda z GPS-em i nawigacją 25.10 (trasy zwykła i odwrócona, zmiany trasy, objazdy).
 > Repo jest publiczne: nie wpisujemy tu współrzędnych z logów, nazw tras ani numeru seryjnego. Sekcja A to fakty z kodu
 > źródłowego karoo-ext 1.1.9 (tag `1.1.9`, commit `26e1d1c`). Sekcję B wypełniamy z logów.
 
@@ -40,13 +40,13 @@ Procedura:
 
 | Pytanie | Wynik | Linie logu |
 |---|---|---|
-| Jednostka i format `TIME_OF_ARRIVAL` (epoch ms? s? sekundy od północy?) | | `PROBE TIME_OF_ARRIVAL @<now>` |
-| Jednostka `TIME_TO_DESTINATION` (s? ms?) | | |
-| Jednostka `DISTANCE_TO_DESTINATION` (m?) i wartości `NAVIGATION_STATE` / `ON_ROUTE` | | |
+| Jednostka i format `TIME_OF_ARRIVAL` (epoch ms? s? sekundy od północy?) | **Czas epoki w ms** (np. 1,7929355e12 = 14:38 lokalnie). Bywa chwilowo `Streaming` z pustą mapą wartości — traktujemy jak brak. | 25.10, 09:56 |
+| Jednostka `TIME_TO_DESTINATION` (s? ms?) | **ms** (1,694e7 ms ≈ 4 h 42 min, zgodne z `TIME_OF_ARRIVAL` z tej samej chwili). | 25.10, 09:56 |
+| Jednostka `DISTANCE_TO_DESTINATION` (m?) i wartości `NAVIGATION_STATE` / `ON_ROUTE` | **Metry** (107 066 m przy `routeDistance` 107 916 m na starcie). `NAVIGATION_STATE=0`, `ON_ROUTE=0` także w trakcie nawigacji na trasie — pola nie nadają się do wykrywania „na trasie". `AVERAGE_SPEED` i `SPEED` w **m/s**. | 25.10 |
 | Precyzja `routePolyline` (5 czy 6) | **5.** Trasa 68 422 m (`routeDistance`): p5 daje 68 345 m (−0,1%, różnica po uproszczeniu), a p6 daje bzdurne współrzędne (5,2°N). 1098 punktów, 3440 znaków. | `detectPrecision=5` (24.10, 20:17) |
-| Czy przy `reversed=true` polyline jest już odwrócona? (porównaj `first`/`last` z trasą normalną) | | |
-| Kiedy ETA ma wartość (przed nagrywaniem? tylko w nawigacji?) | Bez trasy: ETA i dystans `NotAvailable`. **Trasa wybrana, brak GPS-u, brak nagrywania:** `TIME_OF_ARRIVAL` i `TIME_TO_DESTINATION` w stanie `Idle`; `DISTANCE_TO_DESTINATION` w stanie `Streaming`, ale **bez pola dystansu** — tylko `NAVIGATION_STATE=0`, `ON_ROUTE=0`, `REROUTING_ENABLED=1`. Kod musi obsłużyć brak pola (jest „Optional"). Z GPS-em i w jeździe: **do zmierzenia**. | |
-| ETA i dystans przy zjechaniu z trasy / rejoin | | |
+| Czy przy `reversed=true` polyline jest już odwrócona? (porównaj `first`/`last` z trasą normalną) | **Tak — polyline jest już w kierunku jazdy**, ostatni punkt = meta (trasa „do Mrozów" odwrócona: ostatni punkt 70 m od stacji Mrozy, `DISTANCE_TO_DESTINATION` 8 km zgodne z jazdą w tę stronę). Wersja testowa z 25.10 rano odwracała punkty drugi raz — błąd, poprawiony. | 25.10, 12:57 |
+| Kiedy ETA ma wartość (przed nagrywaniem? tylko w nawigacji?) | Bez trasy: ETA i dystans `NotAvailable`. **Trasa wybrana, brak GPS-u, brak nagrywania:** `TIME_OF_ARRIVAL` i `TIME_TO_DESTINATION` w stanie `Idle`; `DISTANCE_TO_DESTINATION` w stanie `Streaming`, ale **bez pola dystansu** — tylko `NAVIGATION_STATE=0`, `ON_ROUTE=0`, `REROUTING_ENABLED=1`. Kod musi obsłużyć brak pola (jest „Optional"). Z GPS-em i w jeździe: **do zmierzenia**. |  **Z GPS-em:** ETA i dystans dostępne od razu po wyborze trasy, gdy jest fix i ruch; przy wyborze trasy na auto-pauzie na początku jazdy strumienie były puste przez ~10 min (do ruszenia). Fallback „≈" pokrywa ten czas. |
+| ETA i dystans przy zjechaniu z trasy / rejoin | Przy zjechaniu Karoo emituje kolejne `NavigatingRoute` z tą samą `routePolyline` i rosnącym `rejoinPolyline`/`rejoinDistance` (pierwszy punkt = rowerzysta). `routeKey` bez rejoinu → bez przeliczania geometrii; potwierdzone w logu (jedna „Geometria" na trasę). | 25.10, 10:21 |
 | Czy P1 występuje (`PROBE P1:`) i czy ponowna subskrypcja pomaga | Wybór trasy przy działającej subskrypcji: `NavigatingRoute` przyszło od razu, **P1 nie wystąpił**. Pole `NAVIGATION_STATE` zmienia się null → 0.0 ~1,5 s *po* zdarzeniu, a pierwsza wersja watchdoga liczyła tylko zdarzenia po zmianie i dała **fałszywy alarm**. Poprawione: okno ±5 s, test z tą sekwencją. Ponowna subskrypcja natychmiast (0,1 s) dostarcza bieżący stan, więc jest bezpieczna. | `PROBE P1:` 20:17:44 |
 | Czy `SystemNotification.actionIntent` otwiera aktywność | **Tak.** Dotknięcie powiadomienia daje `onNewIntent action=pl.kolejka.karoo.MAIN`. Dotknięcie kafelka w jeździe (`actionStartActivity`) też otwiera aplikację (`action=null`, flags 0x30400000). | 20:23:42, 20:20:31 |
 | `LaunchPinDrop` — co pokazuje Karoo | **Działa.** Karoo otwiera ekran nawigacji do pinezki z zaznaczonym POI („Warszawa Gdańska"); stamtąd jedno dotknięcie uruchamia nawigację. | relacja użytkownika |

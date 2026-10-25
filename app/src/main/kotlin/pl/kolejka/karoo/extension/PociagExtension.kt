@@ -7,7 +7,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import pl.kolejka.karoo.BuildConfig
+import pl.kolejka.karoo.data.BundledTimetable
+import java.time.Clock
 import pl.kolejka.karoo.log.FileLog
 import pl.kolejka.karoo.probe.DeviceProbe
 import pl.kolejka.karoo.probe.ProbeDataType
@@ -21,7 +24,11 @@ class PociagExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAME) {
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> FileLog.e("Nieobsłużony wyjątek w serwisie", e) },
     )
 
-    override val types by lazy { listOf(ProbeDataType(extension)) }
+    private val engine by lazy {
+        TileEngine(RealKarooSource(karoo), BundledTimetable.load(this), Clock.systemUTC(), scope)
+    }
+
+    override val types by lazy { listOf(TrainDataType(extension) { engine }, ProbeDataType(extension)) }
 
     override fun onCreate() {
         super.onCreate()
@@ -30,6 +37,7 @@ class PociagExtension : KarooExtension(EXTENSION_ID, BuildConfig.VERSION_NAME) {
             FileLog.i("KarooSystem connected=$connected libVersion=${karoo.libVersion} info=${karoo.info}")
         }
         DeviceProbe(karoo, scope).start()
+        if (BuildConfig.DEBUG) scope.launch { FileLog.i(engine.selfCheck("Siedlce")) }
     }
 
     override fun onDestroy() {

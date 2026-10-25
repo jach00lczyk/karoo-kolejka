@@ -24,3 +24,6 @@ captures/
 # Sekrety — repo jest publiczne
 gradle.properties.local
 *.env
+
+# Rozkład wbudowany tylko w build debug (test przed fazą 2) — generowany lokalnie
+app/src/debug/assets/timetable.sqlite

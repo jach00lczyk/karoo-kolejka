@@ -2,6 +2,9 @@
     <string name="app_name">Pociąg do Warszawy</string>
     <string name="extension_name">Pociąg do Warszawy</string>
 
+    <string name="tile_name">Pociąg do Warszawy</string>
+    <string name="tile_description">Pociągi z mety i stacji po drodze (wersja testowa)</string>
+
     <!-- Faza 0 -->
     <string name="probe_name">Pociąg: diagnostyka</string>
     <string name="probe_description">Surowe dane nawigacji i ETA (faza 0)</string>

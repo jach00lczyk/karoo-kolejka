@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Po jeździe testowej (2026-10-25 wieczór)
+
+- Faza 0: jednostki ustalone (TIME_OF_ARRIVAL epoch ms, TIME_TO_DESTINATION ms, dystans m,
+  prędkość m/s) — `KarooUnits` bez zgadywania. Przy `reversed=true` polyline jest już w kierunku
+  jazdy: usunięto błędne podwójne odwracanie (meta liczona na złym końcu trasy).
+- Duży kafel (układ uzgodniony na urządzeniu): meta „skąd → dokąd" z 🚲 ETA i dystansem
+  (bez dystansu z Karoo — długość trasy), pociągi z kółkami 🟠 do złapania / 🟢 główny /
+  🔵 następny / 🔴 odpada, ⚠️ zamiast 🟢 przy zapasie < 5 min, czerwony dopisek OSTATNI,
+  🚌 dla ZKA. Stacje po drodze małą czcionką: „skąd → dokąd", 🚲 ETA i dystans, pierwszy
+  osiągalny pociąg. Czcionka zmniejszana iteracyjnie, aż wszystko się zmieści (szerokość
+  liczona per linia, emoji = 2 znaki).
+
+### Wersja testowa kafelka (2026-10-25, przed fazami 2 i 5)
+
+- Pole „Pociąg do Warszawy": meta z 3 pociągami (▲/●/○) oraz 2 najbliższe stacje przed
+  rowerzystą z pierwszym osiągalnym pociągiem. Podgląd w edytorze jest statyczny i nieklikalny.
+- Rozkład wbudowany tylko w build debug (`app/src/debug/assets/`, poza repo), kopiowany do plików
+  aplikacji. `SqliteTimetable` (read-only) to docelowa część fazy 2.
+- `KarooSource` + `RealKarooSource` (z obejściem P1), `TileEngine` (RouteTracker → planer →
+  histereza; tik minutowy, przeliczanie tylko przy istotnej zmianie wejść), `TileRenderer`
+  (czcionka dobierana do wysokości pola).
+- Jednostki ETA nie są jeszcze znane: `KarooUnits` przyjmuje tylko interpretacje dające sensowną
+  prędkość, w innym razie fallback z „≈". Przy `reversed=true` punkty trasy są odwracane — do
+  potwierdzenia w fazie 0.
+- Domena: `UpcomingStations`, `KarooUnits`, `TileText` (+ testy, w tym scenariusz trasy do
+  Siedlec). Razem 69 testów.
+- Autotest na Karoo 3: rozkład otwiera się, zapytanie dla Siedlec zwraca pociągi w < 0,2 s.
+
 ### Faza 0 — pierwsze pomiary na Karoo 3 (2026-10-24, w domu, bez GPS-u)
 
 - Potwierdzone: serwis startuje sam po bootcie, polyline ma precyzję 5, powiadomienie i kafelek
