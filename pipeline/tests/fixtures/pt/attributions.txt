@@ -1,0 +1,2 @@
+attribution_id,organization_name,attribution_url,is_producer,is_operator,is_authority,is_data_source
+KM,Data: Koleje Mazowieckie,https://example.invalid/km,0,1,0,1

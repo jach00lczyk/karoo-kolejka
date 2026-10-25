@@ -1,0 +1,3 @@
+route_id,service_id,trip_id,trip_headsign
+A,S1,W1,Warszawa Śródmieście WKD
+Z,S1,W2,Warszawa Śródmieście WKD

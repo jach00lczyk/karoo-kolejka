@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+pipeline/dist/
+pipeline/cache/
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# macOS
+.DS_Store
+
+# Sekrety — repo jest publiczne
+gradle.properties.local
+*.env

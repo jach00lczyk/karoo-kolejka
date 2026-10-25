@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExtensionInfo
+    displayName="@string/extension_name"
+    icon="@drawable/ic_train"
+    id="pociag"
+    scansDevices="false">
+    <!-- Faza 0: pole diagnostyczne. Docelowy kafelek (SPEC 7) zastąpi je w fazie 5. -->
+    <DataType
+        description="@string/probe_description"
+        displayName="@string/probe_name"
+        graphical="true"
+        icon="@drawable/ic_train"
+        typeId="probe" />
+</ExtensionInfo>

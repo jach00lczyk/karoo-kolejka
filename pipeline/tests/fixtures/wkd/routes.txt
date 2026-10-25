@@ -1,0 +1,3 @@
+agency_id,route_id,route_short_name,route_long_name,route_type
+0,A,WKD,Warszawska Kolej Dojazdowa,2
+0,Z,WKD ZKA,Warszawska Kolej Dojazdowa - ZKA,3

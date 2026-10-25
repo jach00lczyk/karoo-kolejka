@@ -1,0 +1,8 @@
+trip_id,route_id,service_id,trip_headsign
+T1,KM_R2,KM_WEEKDAY,Warszawa Zachodnia
+T2,KM_R2,KM_SAT,Warszawa Wileńska
+T3,KM_R2_BUS,KM_WEEKDAY,Warszawa Wileńska
+T4,SKM_S2,SKM_ALL,Warszawa Gdańska
+T5,IC_X,IC_ALL,Warszawa Śródmieście
+T6,KM_R2,KM_OLD,Warszawa Wileńska
+T7,KM_R2,KM_WEEKDAY,Warszawa Wileńska

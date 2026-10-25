@@ -1,0 +1,6 @@
+stop_id,stop_name,stop_code,stop_lat,stop_lon
+wsrod,Warszawa Śródmieście WKD,,52.227686,21.000404
+wocho,Warszawa Ochota WKD,,52.225420,20.989605
+wocho_bus_d0,Plac Zawiszy,2,52.224764,20.987591
+wzach,Warszawa Zachodnia WKD,,52.219443,20.965557
+prpkp_bus,PKP Pruszków,1,52.167567,20.798002

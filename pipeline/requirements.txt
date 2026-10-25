@@ -1,0 +1,2 @@
+# build_timetable.py korzysta wyłącznie z biblioteki standardowej; poniżej tylko testy.
+pytest==8.3.5

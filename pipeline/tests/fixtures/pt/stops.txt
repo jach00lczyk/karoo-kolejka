@@ -1,0 +1,16 @@
+stop_id,stop_name,platform_code,stop_lat,stop_lon,location_type,parent_station
+100,Mińsk Mazowiecki,,52.17900,21.56700,1,
+100_RAIL_1_2,Mińsk Mazowiecki,1 t. 2,52.17901,21.56701,0,100
+100_BUS,Mińsk Mazowiecki,,52.17950,21.56750,0,100
+100_EXIT_1,ul. Kolejowa,,52.17960,21.56760,2,100
+200,Warszawa Wileńska,,52.25570,21.03832,1,
+200_RAIL_2_2,Warszawa Wileńska,2 t. 2,52.25575,21.03823,0,200
+200_BUS,Warszawa Wileńska,,52.25580,21.03840,0,200
+300,Warszawa Gdańska,,52.25912,20.99312,1,
+300_RAIL_3_1,Warszawa Gdańska,3 t. 1,52.25905,20.99306,0,300
+400,Warszawa Śródmieście,,52.22939,21.00760,1,
+400_RAIL_1_3,Warszawa Śródmieście,1/2 t. 3,52.22931,21.00762,0,400
+500,Warszawa Zachodnia,,52.22006,20.96524,1,
+500_RAIL_4_4,Warszawa Zachodnia,4 t. 4,52.22006,20.96524,0,500
+600,Kraków Główny,,50.06800,19.94700,1,
+600_RAIL_1_1,Kraków Główny,1 t. 1,50.06800,19.94700,0,600

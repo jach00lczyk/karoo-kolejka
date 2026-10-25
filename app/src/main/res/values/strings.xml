@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Pociąg do Warszawy</string>
+    <string name="extension_name">Pociąg do Warszawy</string>
+
+    <!-- Faza 0 -->
+    <string name="probe_name">Pociąg: diagnostyka</string>
+    <string name="probe_description">Surowe dane nawigacji i ETA (faza 0)</string>
+    <string name="probe_title">Faza 0 — próby na urządzeniu</string>
+    <string name="probe_notification">Powiadomienie</string>
+    <string name="probe_pin">Pinezka</string>
+    <string name="probe_http_small">HTTP Karoo (mały)</string>
+    <string name="probe_http_large">HTTP Karoo (0,5 MB)</string>
+    <string name="probe_direct">Pobierz bezpośrednio</string>
+    <string name="probe_location">Pozycja</string>
+</resources>

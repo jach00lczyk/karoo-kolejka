@@ -1,0 +1,43 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["pipeline/**", "docs/**", "*.md"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # karoo-ext ze źródeł (tag 1.1.9) do mavenLocal — CI nie potrzebuje tokena GitHub Packages.
+      - name: karoo-ext 1.1.9
+        run: |
+          git clone --depth 1 --branch 1.1.9 https://github.com/hammerheadnav/karoo-ext.git "$RUNNER_TEMP/karoo-ext"
+          cd "$RUNNER_TEMP/karoo-ext"
+          ./gradlew -q :lib:publishToMavenLocal -Pgpr.user=ci -Pgpr.key=ci
+
+      - name: Testy
+        run: ./gradlew test
+
+      - name: Build
+        run: ./gradlew :app:assembleDebug :app:assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/build/outputs/apk/**/*.apk
+          retention-days: 14

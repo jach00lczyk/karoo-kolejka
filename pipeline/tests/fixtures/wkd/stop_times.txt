@@ -1,0 +1,7 @@
+trip_id,stop_sequence,stop_id,arrival_time,departure_time
+W1,0,wzach,07:00:00,07:00:00
+W1,1,wocho,07:04:00,07:04:00
+W1,2,wsrod,07:06:00,07:06:00
+W2,0,prpkp_bus,06:00:00,06:00:00
+W2,1,wocho_bus_d0,06:30:00,06:30:00
+W2,2,wsrod,06:35:00,06:35:00

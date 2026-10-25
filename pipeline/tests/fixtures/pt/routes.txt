@@ -1,0 +1,5 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+KM_R2,KM,R2,Warszawa — Łuków,2
+KM_R2_BUS,KM,Z2,Warszawa — Łuków (ZKA),3
+SKM_S2,SKM,S2,Lotnisko — Sulejówek,2
+IC_X,IC,IC,Intercity,2
