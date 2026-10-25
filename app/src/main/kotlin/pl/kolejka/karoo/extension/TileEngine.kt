@@ -28,6 +28,7 @@ import pl.kolejka.karoo.domain.model.TargetGroups
 import pl.kolejka.karoo.domain.plan.EtaEstimator
 import pl.kolejka.karoo.domain.plan.KarooEtaSample
 import pl.kolejka.karoo.domain.plan.RideProgress
+import pl.kolejka.karoo.domain.plan.RouteContext
 import pl.kolejka.karoo.domain.plan.TileStabilizer
 import pl.kolejka.karoo.domain.plan.TileState
 import pl.kolejka.karoo.domain.plan.TrainPlanner
@@ -55,6 +56,11 @@ class TileEngine(
     private val clock: Clock,
     scope: CoroutineScope,
 ) {
+    private val _routeContext = kotlinx.coroutines.flow.MutableStateFlow<RouteContext?>(null)
+
+    /** Kontekst trasy z ostatniego obliczenia — dla ekranów aplikacji; null bez trasy. */
+    val routeContext: StateFlow<RouteContext?> get() = _routeContext
+
     val model: StateFlow<TileModel> = combine(timetables, settings) { tt, s -> tt to s }
         .distinctUntilChanged()
         .flatMapLatest { (tt, s) -> if (tt == null) flowOf(TileModel(TileState.DataMissing)) else Pipeline(tt, s).models() }
@@ -84,6 +90,7 @@ class TileEngine(
                             stabilizer.reset()
                             lastKarooEta = null
                             lastRemaining = null
+                            _routeContext.value = null
                             flowOf(TileModel(TileState.NoRoute, stationName = nameOf))
                         }
                         is RouteState.Computing -> flowOf(TileModel(TileState.Computing, stationName = nameOf))
@@ -141,8 +148,9 @@ class TileEngine(
                 lastLoggedState = kind
                 lastLogAt = clock.millis()
             }
+            _routeContext.value = RouteContext(rs.geometry, routeDistance, progress.copy(remainingM = remaining), finishEta, settings, targets, state)
             // Bez DISTANCE_TO_DESTINATION (np. przed ruszeniem) dystans z długości trasy, jak przy stacjach po drodze.
-            TileModel(state, next, nameOf, finishEta, remaining ?: routeDistance)
+            TileModel(state, next, nameOf, finishEta, remaining ?: routeDistance, clickable = settings.tileClickable)
         } catch (e: Exception) {
             FileLog.e("Błąd obliczeń kafelka", e)
             TileModel(TileState.Computing, stationName = nameOf)

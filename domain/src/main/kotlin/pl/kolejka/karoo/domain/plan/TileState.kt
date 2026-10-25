@@ -26,6 +26,28 @@ data class Alternative(
     val train: Train,
 )
 
+/** Zakładka „Meta": kandydat, ETA mety, gotowość na peronie i pociągi (SPEC 8.1). */
+data class FinishBoard(
+    val candidate: pl.kolejka.karoo.domain.geo.FinishCandidate,
+    val eta: Eta,
+    val ready: Instant,
+    val options: List<TrainOption>,
+)
+
+/**
+ * Bieżący kontekst trasy dla ekranów aplikacji (SPEC 8): to samo, z czego liczony jest kafelek.
+ * Aplikacja na jego podstawie liczy własne, dłuższe listy.
+ */
+data class RouteContext(
+    val geometry: pl.kolejka.karoo.domain.geo.RouteGeometry,
+    val routeDistanceM: Double,
+    val progress: RideProgress,
+    val finishEta: Eta,
+    val settings: pl.kolejka.karoo.domain.model.Settings,
+    val targets: pl.kolejka.karoo.domain.model.TargetGroups,
+    val state: TileState,
+)
+
 /** Stany wyniku; każdy ma widok kafelka (SPEC 6.9). */
 sealed interface TileState {
     data object NoRoute : TileState

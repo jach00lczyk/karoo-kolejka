@@ -95,6 +95,34 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
         )
     }
 
+    /**
+     * Tablica dla zakładki „Meta" (SPEC 8.1): do [count] pociągów od t_ready − 30 min do końca dnia,
+     * sklasyfikowanych jak na kafelku, z oznaczeniem ostatniego.
+     */
+    fun finishBoard(
+        candidate: FinishCandidate,
+        routeDistanceM: Double,
+        progress: RideProgress,
+        settings: Settings,
+        targets: TargetGroups,
+        count: Int = 8,
+    ): FinishBoard {
+        val now = clock.instant()
+        val eta = EtaEstimator.finishEta(
+            now, progress.karooEta, progress.lastKarooEta, progress.remainingM, routeDistanceM,
+            progress.movingAvgSpeedMps, settings.fallbackSpeedKmh,
+        )
+        val remaining = progress.remainingM?.takeIf { it.isFinite() && it >= 0 } ?: routeDistanceM
+        val ctx = Ctx(now, eta, remaining, settings, targets)
+        val ready = tReady(candidate, ctx)
+        val trains = trainsFrom(candidate.station.id, ready.minus(WINDOW_BEFORE), serviceDayEnd(ready), targets)
+        val options = trains.take(count).map { classify(it, ready, remaining + candidate.distanceM, ctx) }.toMutableList()
+        if (options.isNotEmpty() && trains.size <= count) {
+            options[options.lastIndex] = options.last().copy(isLast = true)
+        }
+        return FinishBoard(candidate, eta, ready, options)
+    }
+
     /** Pociągi z okna dla jednego kandydata, sklasyfikowane względem t_ready. */
     private fun evaluate(c: FinishCandidate, ctx: Ctx, windowEnd: Duration): List<TrainOption> {
         val tReady = tReady(c, ctx)

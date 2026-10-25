@@ -20,6 +20,8 @@ data class TileModel(
     /** ETA mety i pozostały dystans — do linii 🚲 w nagłówku. */
     val finishEta: Eta? = null,
     val remainingM: Double? = null,
+    /** Ustawienie „Kafelek otwiera aplikację" (P3). */
+    val clickable: Boolean = true,
 )
 
 enum class Emphasis { NORMAL, WARN, ALERT, DIM }

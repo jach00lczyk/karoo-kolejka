@@ -45,7 +45,7 @@ object PreviewData {
     const val REMAINING_M = 24_300.0
 
     val upcoming = listOf(
-        UpcomingStation(sulejowek, 21_000.0, 300.0, 9_400.0, at(16, 25), train(4, LocalTime.of(16, 34), LocalTime.of(17, 0), "1")),
-        UpcomingStation(debe, 28_000.0, 200.0, 16_400.0, at(16, 45), train(5, LocalTime.of(16, 58), LocalTime.of(17, 37), "2")),
+        UpcomingStation(sulejowek, 21_000.0, 300.0, 9_400.0, at(16, 25), listOf(train(4, LocalTime.of(16, 34), LocalTime.of(17, 0), "1"))),
+        UpcomingStation(debe, 28_000.0, 200.0, 16_400.0, at(16, 45), listOf(train(5, LocalTime.of(16, 58), LocalTime.of(17, 37), "2"))),
     )
 }

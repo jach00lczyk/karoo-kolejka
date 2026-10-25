@@ -16,6 +16,9 @@ import pl.kolejka.karoo.data.SettingsRepository
 import pl.kolejka.karoo.data.SqliteTimetable
 import pl.kolejka.karoo.data.SqliteValidator
 import pl.kolejka.karoo.domain.update.TimetableFiles
+import pl.kolejka.karoo.extension.KarooSource
+import pl.kolejka.karoo.extension.RealKarooSource
+import pl.kolejka.karoo.extension.TileEngine
 import pl.kolejka.karoo.domain.update.TimetableUpdater
 import pl.kolejka.karoo.domain.update.UpdateResult
 import pl.kolejka.karoo.log.FileLog
@@ -34,8 +37,20 @@ object AppContainer {
     /** Aktualny rozkład; zmienia się po udanej aktualizacji. */
     val timetable: StateFlow<SqliteTimetable?> get() = _timetable
 
-    /** Ustawiane przez serwis rozszerzenia, gdy połączy się z Karoo (manifest przez Karoo HTTP). */
-    @Volatile var karoo: KarooSystemService? = null
+    /**
+     * Jedno połączenie z Karoo na proces (kafelek, aplikacja, aktualizator). Konsumenci
+     * dodani przed połączeniem są rejestrowani po nim (karoo-ext).
+     */
+    val karoo: KarooSystemService by lazy {
+        KarooSystemService(app).also { k ->
+            k.connect { FileLog.i("KarooSystem connected=$it libVersion=${k.libVersion}") }
+        }
+    }
+
+    val source: KarooSource by lazy { RealKarooSource(karoo) }
+
+    /** Silnik kafla współdzielony z ekranami aplikacji (SPEC 8: „jedna instancja w procesie"). */
+    val engine: TileEngine by lazy { TileEngine(source, timetable, settings.settings, Clock.systemUTC(), scope) }
 
     val updateEnv: AndroidUpdateEnvironment by lazy { AndroidUpdateEnvironment(app) }
     val settings: SettingsRepository by lazy { SettingsRepository(app) }
@@ -46,7 +61,7 @@ object AppContainer {
         TimetableUpdater(
             files = files,
             manifestUrl = BuildConfig.MANIFEST_URL,
-            http = AndroidUpdateHttp { karoo },
+            http = AndroidUpdateHttp { karoo.takeIf { it.connected } },
             validator = SqliteValidator,
             env = updateEnv,
             clock = Clock.systemUTC(),

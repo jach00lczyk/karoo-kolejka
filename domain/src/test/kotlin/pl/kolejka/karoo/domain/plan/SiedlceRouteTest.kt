@@ -114,4 +114,24 @@ class SiedlceRouteTest {
         val mrozy = up.first { it.station.name == "Mrozy" }
         assertEquals(30_000 + mrozy.alongM, mrozy.distanceM, 1.0)
     }
+
+    @Test
+    fun `finish board lists trains from ready time and on-route view includes passed stations`() {
+        val g = RouteAnalyzer.analyze(route, SpatialIndex(timetable.stations), 1000.0, 1000.0)!!
+        val routeM = g.lengthM
+        val clock = Clock.fixed(at(13, 0), ZoneOffset.UTC)
+        val planner = TrainPlanner(timetable, clock)
+        val progress = RideProgress(remainingM = routeM - 15_000, karooEta = at(14, 50)) // za Mrozami
+        val board = planner.finishBoard(g.finishCandidates.single(), routeM, progress, Settings(), targets, count = 8)
+        // t_ready ≈ 14:56 → od 14:26: 14:30 … 19:30 (6 kursów, ostatni oznaczony)
+        assertEquals((14..19).map { at(it, 30) }, board.options.map { it.train.departure })
+        assertTrue(board.options.last().isLast)
+        assertEquals(TrainClass.SURE, board.options[1].cls)
+
+        val eta = EtaEstimator.finishEta(clock.instant(), progress.karooEta, null, progress.remainingM, routeM, null, 25.0)
+        val all = UpcomingStations(planner, clock).compute(g, routeM, progress, eta, Settings(), targets, limit = 10, trainsPerStation = 4, includePassed = true)
+        assertEquals(listOf("Kotuń", "Mrozy"), all.map { it.station.name })
+        assertEquals(4, all[0].trains.size)
+        assertTrue(all[1].passed && all[1].trains.isEmpty())
+    }
 }

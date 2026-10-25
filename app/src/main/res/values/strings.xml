@@ -23,4 +23,65 @@
     <string name="update_up_to_date">Rozkład jest aktualny</string>
     <string name="update_deferred">Nowy rozkład pobiorę po zakończeniu jazdy</string>
     <string name="update_failed">Nie udało się: %1$s</string>
+
+    <!-- Zakładki (SPEC 8) -->
+    <string name="tab_finish">Meta</string>
+    <string name="tab_on_route">Po drodze</string>
+    <string name="tab_all">Stacje</string>
+    <string name="tab_settings">Opcje</string>
+    <string name="back">← Wstecz</string>
+    <string name="navigate_to_station">Prowadź do stacji</string>
+
+    <!-- Meta -->
+    <string name="no_route">Brak trasy</string>
+    <string name="no_route_hint">Wybierz trasę w Karoo, a tu pojawią się pociągi z mety. Rozkład dowolnej stacji znajdziesz w zakładce Stacje.</string>
+    <string name="go_all_stations">Wszystkie stacje</string>
+    <string name="computing">Liczę…</string>
+    <string name="no_station_near_finish">Brak stacji ≤ %1$s od mety</string>
+    <string name="nearest_station">Najbliższa: %1$s (%2$s)</string>
+    <string name="go_on_route">Stacje po drodze</string>
+    <string name="from_finish">%1$s od mety</string>
+    <string name="finish_eta">🚲 meta %1$s · %2$s</string>
+    <string name="eta_karoo">ETA z Karoo</string>
+    <string name="eta_approx">≈ szacunek</string>
+    <string name="ready_at">Na peronie gotowy ok. %1$s</string>
+    <string name="no_trains">Brak pociągów do celów do końca dnia</string>
+    <string name="candidates">Stacje przy mecie</string>
+
+    <!-- Po drodze -->
+    <string name="no_stations_on_route">Brak stacji ≤ %1$s od trasy</string>
+    <string name="station_on_route_info">km %1$s · %2$s od trasy</string>
+    <string name="station_eta">🚲 %1$s · %2$s</string>
+    <string name="passed">minięta</string>
+    <string name="recommended">⚠️ polecana — zdążysz tu na pociąg</string>
+    <string name="no_reachable_train">Brak osiągalnego pociągu do celów</string>
+
+    <!-- Wszystkie stacje -->
+    <string name="search_hint">Szukaj stacji (bez polskich znaków)</string>
+    <string name="today">Dziś</string>
+    <string name="tomorrow">Jutro</string>
+    <string name="no_departures">Brak odjazdów do celów</string>
+    <string name="target_station">Stacja docelowa</string>
+
+    <!-- Ustawienia (SPEC 8.4) -->
+    <string name="settings_targets">Stacje docelowe (od najważniejszej)</string>
+    <string name="settings_targets_default">domyślne</string>
+    <string name="settings_add_target">Dodaj stację</string>
+    <string name="settings_restore_defaults">Przywróć domyślne</string>
+    <string name="settings_pick_target">Wybierz stację docelową</string>
+    <string name="settings_finish_radius">Stacja przy mecie (promień)</string>
+    <string name="settings_route_radius">Stacje po drodze (odległość od trasy)</string>
+    <string name="settings_access_speed">Dojazd z mety na stację</string>
+    <string name="settings_buffer">Zapas na peronie</string>
+    <string name="settings_fallback_speed">Prędkość, gdy brak ETA z Karoo</string>
+    <string name="settings_vmax">„Do złapania" do prędkości</string>
+    <string name="settings_mode">Wybór pociągu</string>
+    <string name="settings_mode_fastest">Najszybciej</string>
+    <string name="settings_mode_strict">Najważniejsza stacja</string>
+    <string name="settings_strict_tolerance">…chyba że później o więcej niż</string>
+    <string name="settings_tile_clickable">Dotknięcie kafelka otwiera aplikację</string>
+    <string name="settings_notifications">Powiadomienie po wyborze trasy</string>
+    <string name="unit_m">%1$d m</string>
+    <string name="unit_kmh">%1$d km/h</string>
+    <string name="unit_min">%1$d min</string>
 </resources>

@@ -23,6 +23,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import io.hammerhead.karooext.models.ViewConfig
 import pl.kolejka.karoo.MainActivity
+import pl.kolejka.karoo.ui.Tab
 import pl.kolejka.karoo.domain.plan.TileState
 import pl.kolejka.karoo.domain.text.Emphasis
 import pl.kolejka.karoo.domain.text.LineSize
@@ -54,8 +55,10 @@ class TileRenderer(private val context: Context) {
 
         return glance.compose(context, DpSize.Unspecified) {
             var modifier = GlanceModifier.fillMaxSize().background(background).padding(horizontal = 4.dp, vertical = 2.dp)
-            if (!config.preview) {
+            // Podgląd w edytorze nieklikalny (P3); ustawienie może wyłączyć klikalność.
+            if (!config.preview && model.clickable) {
                 val intent = Intent(context, MainActivity::class.java)
+                    .putExtra(Tab.EXTRA_TAB, tabFor(model).name)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 modifier = modifier.clickable(actionStartActivity(intent))
             }
@@ -119,6 +122,14 @@ class TileRenderer(private val context: Context) {
         LineSize.LARGE -> 1f
         LineSize.MEDIUM -> MEDIUM
         LineSize.SMALL -> SMALL
+    }
+
+    /** Zakładka otwierana kliknięciem kafelka (SPEC 7.4). */
+    private fun tabFor(model: TileModel): Tab = when (val s = model.state) {
+        is TileState.Ok, is TileState.NoTrainsToday, is TileState.AlreadyAtTarget -> Tab.FINISH
+        is TileState.LastTrainMissed -> if (s.alternative != null) Tab.ON_ROUTE else Tab.FINISH
+        is TileState.NoStationNearFinish -> if (s.stationsOnRoute > 0) Tab.ON_ROUTE else Tab.ALL
+        else -> Tab.ALL
     }
 
     private fun colorOf(e: Emphasis) = when (e) {

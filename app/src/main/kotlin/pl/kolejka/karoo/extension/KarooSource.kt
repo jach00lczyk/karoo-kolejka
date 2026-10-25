@@ -4,7 +4,9 @@ import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.OnNavigationState.NavigationState
+import io.hammerhead.karooext.models.LaunchPinDrop
 import io.hammerhead.karooext.models.RideState
+import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.StreamState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import pl.kolejka.karoo.domain.geo.LatLon
+import pl.kolejka.karoo.domain.model.Station
 import pl.kolejka.karoo.domain.route.NavInput
 import pl.kolejka.karoo.domain.route.NavResubscribeWatchdog
 import pl.kolejka.karoo.log.FileLog
@@ -38,6 +41,9 @@ interface KarooSource {
 
     /** Czy trwa nagrywanie jazdy (pauza też się liczy jako jazda). */
     val recording: Flow<Boolean>
+
+    /** „Prowadź do stacji" — Karoo otwiera pinezkę z opcją nawigacji (SPEC 4.1). */
+    fun navigateTo(station: Station): Boolean
 }
 
 class RealKarooSource(private val karoo: KarooSystemService) : KarooSource {
@@ -66,6 +72,18 @@ class RealKarooSource(private val karoo: KarooSystemService) : KarooSource {
     override fun stream(dataTypeId: String): Flow<StreamState> = karoo.streamDataFlow(dataTypeId)
 
     override val recording: Flow<Boolean> = karoo.consumerFlow<RideState>().map { it !is RideState.Idle }
+
+    override fun navigateTo(station: Station): Boolean = karoo.dispatch(
+        LaunchPinDrop(
+            Symbol.POI(
+                id = "stacja-${station.id}",
+                lat = station.pos.lat,
+                lng = station.pos.lon,
+                type = Symbol.POI.Types.TRANSIT_CENTER,
+                name = station.name,
+            ),
+        ),
+    ).also { FileLog.i("Prowadź do stacji ${station.name}: dispatched=$it") }
 
     private fun NavigationState.toNavInput(): NavInput = when (this) {
         NavigationState.Idle -> NavInput.Idle

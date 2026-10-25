@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Faza 6 — Ekrany aplikacji (2026-10-25, bez powiadomienia i aktualizacji APK)
+
+- Zakładki (SPEC 8): **Meta** (stacja, odległość od mety, 🚲 ETA z Karoo / ≈, gotowość na
+  peronie, „Prowadź do stacji", przełącznik kandydatów, 8 pociągów z tymi samymi znakami co
+  kafel), **Po drodze** (stacje w kolejności trasy: km, odległość od trasy, 🚲 ETA i dystans,
+  pierwszy pociąg; rozwinięcie → 4 pociągi i „Prowadź do stacji"; polecana stacja z SPEC 6.5
+  wyróżniona; minięte na dole), **Stacje** (wyszukiwarka bez polskich znaków po początkach słów,
+  debounce 150 ms, polska kolacja; ekran stacji: dziś/jutro, przewinięcie do „teraz",
+  „Prowadź do stacji"), **Opcje** (edytor stacji docelowych: dodaj z wyszukiwarki — bliźniaki
+  razem, ↑/↓/✕, przywróć domyślne; promienie, prędkości, zapas, tryb, klikalność kafla,
+  powiadomienia; „O danych").
+- Kliknięcie kafla otwiera zakładkę zależną od stanu (SPEC 7.4); przy wyłączonej klikalności
+  kafel nie reaguje (P3).
+- Jeden silnik i jedno połączenie z Karoo w procesie (`AppContainer`); aplikacja korzysta
+  z kontekstu trasy silnika (`RouteContext`) i liczy dłuższe listy (`finishBoard`,
+  `UpcomingStations` z kilkoma pociągami i minionymi stacjami). `KarooSource.navigateTo`
+  (LaunchPinDrop).
+- Domena: `StationSearch` + testy, testy tablicy mety i minionych stacji.
+- Bez szybkiego przewijania literami (SPEC 8.3) — do dodania, jeśli lista okaże się niewygodna.
+
 ### Faza 2 — Dane na Androidzie (2026-10-25)
 
 - `TimetableUpdater` (domena, czysty Kotlin): manifest z GitHub Pages, sprawdzanie najwyżej co
