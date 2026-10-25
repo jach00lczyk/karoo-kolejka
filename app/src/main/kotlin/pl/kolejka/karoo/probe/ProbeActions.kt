@@ -13,7 +13,7 @@ import io.hammerhead.karooext.models.SystemNotification
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import pl.kolejka.karoo.log.FileLog
@@ -70,10 +70,10 @@ object ProbeActions {
                     if (event.state is HttpResponseState.Complete) trySend(event.state as HttpResponseState.Complete)
                 }
                 awaitClose { karoo.removeConsumer(id) }
-            }.first()
+            }.firstOrNull() // onError zamyka flow bez elementu (np. RESPONSE_TOO_LARGE)
         }
         if (result == null) {
-            FileLog.w("PROBE OnHttpResponse: brak odpowiedzi w 120 s")
+            FileLog.w("PROBE OnHttpResponse: brak odpowiedzi (błąd lub 120 s)")
         } else {
             FileLog.i(
                 "PROBE OnHttpResponse Complete status=${result.statusCode} body=${result.body?.size ?: "null"} B " +
@@ -112,7 +112,7 @@ object ProbeActions {
             callbackFlow {
                 val id = karoo.addConsumer<OnLocationChanged> { trySend(it) }
                 awaitClose { karoo.removeConsumer(id) }
-            }.first()
+            }.firstOrNull()
         }
         FileLog.i("PROBE OnLocationChanged: $loc")
     }

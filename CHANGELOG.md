@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Faza 0 — pierwsze pomiary na Karoo 3 (2026-10-24, w domu, bez GPS-u)
+
+- Potwierdzone: serwis startuje sam po bootcie, polyline ma precyzję 5, powiadomienie i kafelek
+  otwierają aplikację, `LaunchPinDrop` działa, `OnHttpResponse` odrzuca 0,5 MB błędem
+  `RESPONSE_TOO_LARGE`, a `HttpURLConnection` na Wi-Fi daje ~8 Mbit/s. Szczegóły w
+  `docs/device-findings.md`.
+- Naprawione: crash sondy po `RESPONSE_TOO_LARGE` (`first()` na pustym flow). Aplikacja dzieli
+  proces z rozszerzeniem, więc padał też serwis. Scope ekranu ma teraz `CoroutineExceptionHandler`.
+- Naprawione: fałszywy alarm watchdoga P1. `NavigatingRoute` przychodzi ~1,5 s przed zmianą
+  `NAVIGATION_STATE`, więc okno to teraz ±5 s (`NavResubscribeWatchdog` z wstrzykiwanym
+  `TimeSource`, 2 nowe testy).
+
 ### Faza 3 — Domena (2026-10-24)
 
 - Moduł `:domain` to czysty Kotlin/JVM, bez zależności od Androida. Zakaz `android.*` w domenie

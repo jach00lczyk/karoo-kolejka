@@ -114,7 +114,8 @@ class DeviceProbe(private val karoo: KarooSystemService, private val scope: Coro
                 val changedAt = now
                 scope.launch {
                     delay(5_000)
-                    if (lastNavEventAt < changedAt) {
+                    // Zdarzenie potrafi przyjść ~1,5 s PRZED zmianą pola (log z 24.10) — liczy się okno ±5 s.
+                    if (lastNavEventAt < changedAt - 5_000) {
                         FileLog.w("PROBE P1: brak OnNavigationState 5 s po zmianie NAVIGATION_STATE — ponowna subskrypcja")
                         subscribeNavigation("P1")
                     }

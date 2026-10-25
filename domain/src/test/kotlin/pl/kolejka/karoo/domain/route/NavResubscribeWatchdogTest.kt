@@ -18,7 +18,7 @@ class NavResubscribeWatchdogTest {
         val field = MutableSharedFlow<Double?>(replay = 1)
         val events = MutableSharedFlow<Any>(extraBufferCapacity = 8)
         val triggers = mutableListOf<Unit>()
-        backgroundScope.launch { NavResubscribeWatchdog(5_000).triggers(field, events).toList(triggers) }
+        backgroundScope.launch { NavResubscribeWatchdog(5_000, testScheduler.timeSource).triggers(field, events).toList(triggers) }
         runCurrent()
         block(field, events, triggers)
     }
@@ -50,5 +50,26 @@ class NavResubscribeWatchdogTest {
         field.emit(null); runCurrent()
         advanceTimeBy(10_000); runCurrent()
         assertEquals(0, triggers.size)
+    }
+
+    @Test
+    fun `event shortly before field change counts (sequence from Karoo 3 log)`() = scenario { field, events, triggers ->
+        // 20:17:38.42 NavigatingRoute, 20:17:39.98 NAVIGATION_STATE null → 0.0
+        events.emit(Unit); runCurrent()
+        advanceTimeBy(1_560)
+        field.emit(0.0); runCurrent()
+        field.emit(1.0); runCurrent()
+        advanceTimeBy(10_000); runCurrent()
+        assertEquals(0, triggers.size)
+    }
+
+    @Test
+    fun `old event before change does not count`() = scenario { field, events, triggers ->
+        field.emit(0.0); runCurrent()
+        events.emit(Unit); runCurrent()
+        advanceTimeBy(60_000)
+        field.emit(1.0); runCurrent()
+        advanceTimeBy(5_001); runCurrent()
+        assertEquals(1, triggers.size)
     }
 }

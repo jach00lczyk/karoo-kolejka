@@ -1,7 +1,8 @@
 # Faza 0 — ustalenia z urządzenia
 
 > Dalsze fazy opierają się na tym pliku, nie na zgadywaniu (SPEC 4.1, 12).
-> Status: **spike gotowy, pomiary na Karoo jeszcze niewykonane.** Sekcja A to fakty z kodu
+> Status: **pomiary w toku** (Karoo 3, ext lib 1.1.9). Testy w domu bez GPS-u zrobione 24.10; jazda z GPS-em jeszcze nie.
+> Repo jest publiczne: nie wpisujemy tu współrzędnych z logów, nazw tras ani numeru seryjnego. Sekcja A to fakty z kodu
 > źródłowego karoo-ext 1.1.9 (tag `1.1.9`, commit `26e1d1c`). Sekcję B wypełniamy z logów.
 
 ## A. Ustalone ze źródeł karoo-ext 1.1.9
@@ -42,16 +43,33 @@ Procedura:
 | Jednostka i format `TIME_OF_ARRIVAL` (epoch ms? s? sekundy od północy?) | | `PROBE TIME_OF_ARRIVAL @<now>` |
 | Jednostka `TIME_TO_DESTINATION` (s? ms?) | | |
 | Jednostka `DISTANCE_TO_DESTINATION` (m?) i wartości `NAVIGATION_STATE` / `ON_ROUTE` | | |
-| Precyzja `routePolyline` (5 czy 6) | | `detectPrecision=` |
+| Precyzja `routePolyline` (5 czy 6) | **5.** Trasa 68 422 m (`routeDistance`): p5 daje 68 345 m (−0,1%, różnica po uproszczeniu), a p6 daje bzdurne współrzędne (5,2°N). 1098 punktów, 3440 znaków. | `detectPrecision=5` (24.10, 20:17) |
 | Czy przy `reversed=true` polyline jest już odwrócona? (porównaj `first`/`last` z trasą normalną) | | |
-| Kiedy ETA ma wartość (przed nagrywaniem? tylko w nawigacji?) | | |
+| Kiedy ETA ma wartość (przed nagrywaniem? tylko w nawigacji?) | Bez trasy: ETA i dystans `NotAvailable`. **Trasa wybrana, brak GPS-u, brak nagrywania:** `TIME_OF_ARRIVAL` i `TIME_TO_DESTINATION` w stanie `Idle`; `DISTANCE_TO_DESTINATION` w stanie `Streaming`, ale **bez pola dystansu** — tylko `NAVIGATION_STATE=0`, `ON_ROUTE=0`, `REROUTING_ENABLED=1`. Kod musi obsłużyć brak pola (jest „Optional"). Z GPS-em i w jeździe: **do zmierzenia**. | |
 | ETA i dystans przy zjechaniu z trasy / rejoin | | |
-| Czy P1 występuje (`PROBE P1:`) i czy ponowna subskrypcja pomaga | | |
-| Czy `SystemNotification.actionIntent` otwiera aktywność | | `MainActivity.onNewIntent action=pl.kolejka.karoo.MAIN` |
-| `LaunchPinDrop` — co pokazuje Karoo | | |
-| `OnHttpResponse` dla 0,5 MB (oczekiwany błąd > 100 KB) | | |
-| Przepustowość `HttpURLConnection`: Wi-Fi / mostek BT | | `kbit/s` |
-| Czy serwis startuje po bootcie (bez `BOOT_COMPLETED`)? | | `Proces start … uptime` |
-| `ViewConfig` dla używanych rozmiarów pól | | `PROBE startView config=` |
+| Czy P1 występuje (`PROBE P1:`) i czy ponowna subskrypcja pomaga | Wybór trasy przy działającej subskrypcji: `NavigatingRoute` przyszło od razu, **P1 nie wystąpił**. Pole `NAVIGATION_STATE` zmienia się null → 0.0 ~1,5 s *po* zdarzeniu, a pierwsza wersja watchdoga liczyła tylko zdarzenia po zmianie i dała **fałszywy alarm**. Poprawione: okno ±5 s, test z tą sekwencją. Ponowna subskrypcja natychmiast (0,1 s) dostarcza bieżący stan, więc jest bezpieczna. | `PROBE P1:` 20:17:44 |
+| Czy `SystemNotification.actionIntent` otwiera aktywność | **Tak.** Dotknięcie powiadomienia daje `onNewIntent action=pl.kolejka.karoo.MAIN`. Dotknięcie kafelka w jeździe (`actionStartActivity`) też otwiera aplikację (`action=null`, flags 0x30400000). | 20:23:42, 20:20:31 |
+| `LaunchPinDrop` — co pokazuje Karoo | **Działa.** Karoo otwiera ekran nawigacji do pinezki z zaznaczonym POI („Warszawa Gdańska"); stamtąd jedno dotknięcie uruchamia nawigację. | relacja użytkownika |
+| `OnHttpResponse` dla 0,5 MB (oczekiwany błąd > 100 KB) | **Odrzucone:** `onError("RESPONSE_TOO_LARGE")` po ~0,25 s, flow kończy się bez elementu. Mały plik (26 KB): 200 OK w 0,25–1,2 s, nagłówki dostępne (`last-modified`, …). Bez sieci od razu `Complete(status=0, error="Unable to resolve host…")` (sonda ustawia `waitForConnection=false`; z `true` żądanie czekałoby w kolejce). | 20:24:31, 20:24:26 |
+| Przepustowość `HttpURLConnection`: Wi-Fi / mostek BT | Wi-Fi: 501 KB w 0,48 s (~8,4 Mbit/s). Mostek BT: **do zmierzenia**. | 20:27:47 |
+| Czy serwis startuje po bootcie (bez `BOOT_COMPLETED`)? | **Tak.** Proces startuje 46–65 s po bootcie bez otwierania aplikacji, `connected=true` po ~0,2 s. `RECEIVE_BOOT_COMPLETED` niepotrzebne. | `Proces start: v0.1.0, uptime=65s` / `uptime=46s` (24.10) |
+| `ViewConfig` dla używanych rozmiarów pól | Pół szerokości `(30,12)` → 240×128 px, textSize 46. Pełna szerokość `(60,12)` → 478×128 px w podglądzie, **478×144 px w jeździe** (wysokość się różni!), textSize 55. `preview` = true w edytorze, false w jeździe. | `PROBE startView config=` (24.10, 20:16) |
 | Czy pole renderuje się z tytułem mimo `showHeader=false` (P2) | | |
 | Long-press na polu w edytorze profilu przy `preview=true` (P3) | | |
+
+## C. Inne obserwacje
+
+- **Aplikacja i rozszerzenie dzielą jeden proces.** Wyjątek w coroutine ekranu (`first()` na
+  pustym flow po `RESPONSE_TOO_LARGE`) zabił też serwis rozszerzenia; Karoo uruchomiło go ponownie
+  po ~6–10 s. Każdy scope UI i serwisu musi mieć `CoroutineExceptionHandler`. W sondzie poprawione.
+- **Koniec jazdy kończy nawigację:** `RideState` Recording → Paused → Idle, a ~0,3 s później
+  `OnNavigationState: Idle`.
+- `SPEED` bez ruchu daje wartości 0,36 i 0,514 (= 0,7 i 1 węzeł w m/s), więc jednostką jest
+  najpewniej **m/s**, a wartości to szum GPS. Do potwierdzenia w jeździe.
+- `OnLocationChanged` bez fixu GPS nie emituje niczego (timeout 30 s → null). Po złapaniu fixu
+  przychodzi co ~4 s, `orientation=null` w bezruchu.
+
+- **Zegar ścianowy cofa się zaraz po starcie** (24.10, drugi boot): po `20:14:29.353` następny wpis
+  ma `20:14:00.317`, czyli korekta wstecz o ~29 s. Logika zależna od różnic czasu (histereza,
+  przytrzymanie ETA 2 min, debounce oparty na zegarze) musi to znosić. Ujemne `Duration`
+  traktujemy jako 0.

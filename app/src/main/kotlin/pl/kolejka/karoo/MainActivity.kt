@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.hammerhead.karooext.KarooSystemService
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -73,7 +74,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProbeScreen(karoo: KarooSystemService) {
-    val scope = rememberCoroutineScope()
+    // Aplikacja i rozszerzenie dzielą proces: wyjątek w UI zabiłby też serwis. Nigdy go nie przepuszczaj.
+    val scope = rememberCoroutineScope { CoroutineExceptionHandler { _, e -> FileLog.e("Błąd w akcji ekranu", e) } }
     val context = androidx.compose.ui.platform.LocalContext.current
     var log by remember { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(Unit) {
