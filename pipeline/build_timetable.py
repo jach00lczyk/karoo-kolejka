@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Buduje mały plik SQLite z rozkładem KM + SKM Warszawa + WKD dla rozszerzenia Karoo.
+"""Buduje mały plik SQLite z rozkładem KM + SKM Warszawa + ŁKA + WKD dla rozszerzenia Karoo.
 
 Wejście: GTFS `polish_trains.zip` i `wkd.zip` (mkuran.pl). Wyjście w katalogu `--out`:
 `manifest.json` oraz `timetable-<version>.sqlite.gz`. Szczegóły: SPEC.md, sekcja 3.
@@ -52,7 +52,12 @@ PT_URL = "https://mkuran.pl/gtfs/polish_trains.zip"
 WKD_URL = "https://mkuran.pl/gtfs/wkd.zip"
 
 # Przewoźnicy z polish_trains wyszukiwani po nazwie (SPEC 3.2.1) → kod w bazie.
-PT_AGENCIES = {"Koleje Mazowieckie": "KM", "SKM Warszawa": "SKM"}
+PT_AGENCIES = {
+    "Koleje Mazowieckie": "KM",
+    "SKM Warszawa": "SKM",
+    # ŁKA (m.in. ŁS Sprinter Łódź – Warszawa Zachodnia/Centralna/Wschodnia), dodana 26.10.2026.
+    "Łódzka Kolej Aglomeracyjna": "LKA",
+}
 
 WINDOW_BEFORE_DAYS = 1
 WINDOW_AFTER_DAYS = 14
@@ -448,7 +453,7 @@ CREATE TABLE stop_time(
 CREATE INDEX stop_time_station_dep ON stop_time(station_id, dep_s);
 """
 
-AGENCY_ORDER = {"KM": 0, "SKM": 1, "WKD": 2}
+AGENCY_ORDER = {"KM": 0, "SKM": 1, "LKA": 2, "WKD": 3}
 
 
 @dataclass
@@ -507,7 +512,7 @@ def build_database(feeds: list[Feed], today: dt.date, out_path: Path) -> BuildRe
                 total[t.agency] += len(t.stop_times)
                 with_platform[t.agency] += sum(1 for st in t.stop_times if st[4])
 
-        for agency in ("KM", "SKM", "WKD"):
+        for agency in (*PT_AGENCIES.values(), "WKD"):
             if agency not in last_date:
                 raise BuildError(f"Brak kursów przewoźnika {agency} w oknie dat")
         valid_to_int = min(last_date.values())

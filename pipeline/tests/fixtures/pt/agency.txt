@@ -2,3 +2,4 @@ agency_id,agency_name,agency_url,agency_timezone
 KM,Koleje Mazowieckie,https://mazowieckie.com.pl/,Europe/Warsaw
 SKM,SKM Warszawa,https://www.skm.warszawa.pl/,Europe/Warsaw
 IC,PKP Intercity,https://intercity.pl/,Europe/Warsaw
+LKA,Łódzka Kolej Aglomeracyjna,https://lka.lodzkie.pl/,Europe/Warsaw

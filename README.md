@@ -1,7 +1,7 @@
 # Pociąg do Warszawy — rozszerzenie Hammerhead Karoo
 
 Rozszerzenie [karoo-ext](https://github.com/hammerheadnav/karoo-ext). Gdy meta trasy leży przy
-stacji KM / SKM Warszawa / WKD, pokazuje, którym pociągiem wrócisz do Warszawy i czy na niego
+stacji KM / SKM Warszawa / ŁKA / WKD, pokazuje, którym pociągiem wrócisz do Warszawy i czy na niego
 zdążysz. Projekt na własny użytek (sideload). Pełna specyfikacja: [SPEC.md](SPEC.md).
 
 ## Stan
@@ -40,5 +40,5 @@ rozszerzenia nie zawsze sam się restartuje.
 
 ## Dane
 
-Rozkład: Koleje Mazowieckie, SKM Warszawa (PKP PLK, warunki ponownego wykorzystania informacji
+Rozkład: Koleje Mazowieckie, SKM Warszawa, Łódzka Kolej Aglomeracyjna (PKP PLK, warunki ponownego wykorzystania informacji
 sektora publicznego), WKD (CC0). Feed GTFS przygotowuje [Mikołaj Kuranowski](https://mkuran.pl/gtfs/).

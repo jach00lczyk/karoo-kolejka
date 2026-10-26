@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Rozkład: dodana ŁKA (2026-10-26)
+
+- Pipeline: przewoźnik Łódzka Kolej Aglomeracyjna (`LKA`; linie Ł, ŁP, **ŁS Sprinter**, ZKA)
+  obok KM, SKM i WKD. Na danych z 25.10: +182 stacje (541), perony ŁKA 100%, plik 1,31 MB.
+- ŁKA dojeżdża do Warszawy Zachodniej, Centralnej i Wschodniej — nie do domyślnych celów
+  (Gdańska, Wileńska, Śródmieście). Pociągi ŁS pojawią się na kafelku dopiero po dodaniu
+  takiej stacji do celów (Opcje → Stacje docelowe).
+- Aplikacja bez zmian: nie ma przewoźników wpisanych na sztywno, nowy rozkład przychodzi
+  z GitHub Pages.
+
 ### Faza 6 — Ekrany aplikacji (2026-10-25, bez powiadomienia i aktualizacji APK)
 
 - Zakładki (SPEC 8): **Meta** (stacja, odległość od mety, 🚲 ETA z Karoo / ≈, gotowość na

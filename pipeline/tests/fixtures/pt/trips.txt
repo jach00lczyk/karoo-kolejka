@@ -6,3 +6,4 @@ T4,SKM_S2,SKM_ALL,Warszawa Gdańska
 T5,IC_X,IC_ALL,Warszawa Śródmieście
 T6,KM_R2,KM_OLD,Warszawa Wileńska
 T7,KM_R2,KM_WEEKDAY,Warszawa Wileńska
+L1,LKA_LS,LKA_ALL,Warszawa Wschodnia

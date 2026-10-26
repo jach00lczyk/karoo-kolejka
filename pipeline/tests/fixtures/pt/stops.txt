@@ -14,3 +14,5 @@ stop_id,stop_name,platform_code,stop_lat,stop_lon,location_type,parent_station
 500_RAIL_4_4,Warszawa Zachodnia,4 t. 4,52.22006,20.96524,0,500
 600,Kraków Główny,,50.06800,19.94700,1,
 600_RAIL_1_1,Kraków Główny,1 t. 1,50.06800,19.94700,0,600
+700,Łódź Fabryczna,,51.76900,19.46700,1,
+700_RAIL_1_1,Łódź Fabryczna,1 t. 1,51.76900,19.46700,0,700

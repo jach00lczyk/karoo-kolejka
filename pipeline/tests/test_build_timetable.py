@@ -79,9 +79,9 @@ def dates(con, tid):
 # --------------------------------------------------------------------------- filtrowanie
 
 
-def test_only_km_skm_wkd(built):
+def test_only_selected_agencies(built):
     con, _, _ = built
-    assert {r[0] for r in con.execute("SELECT DISTINCT agency FROM trip")} == {"KM", "SKM", "WKD"}
+    assert {r[0] for r in con.execute("SELECT DISTINCT agency FROM trip")} == {"KM", "SKM", "LKA", "WKD"}
     assert station(con, "Kraków Główny") is None
 
 
@@ -95,7 +95,8 @@ def test_station_ids_stable_and_agencies(built):
     con, _, _ = built
     assert station(con, "Mińsk Mazowiecki")["id"] == 100
     assert station(con, "Mińsk Mazowiecki")["agencies"] == "KM"
-    assert station(con, "Warszawa Zachodnia")["agencies"] == "KM,SKM"
+    assert station(con, "Warszawa Zachodnia")["agencies"] == "KM,SKM,LKA"
+    assert station(con, "Łódź Fabryczna")["agencies"] == "LKA"
     wkd = station(con, "Warszawa Śródmieście WKD")
     assert wkd["id"] >= bt.WKD_ID_BASE
     assert wkd["agencies"] == "WKD"
@@ -204,6 +205,12 @@ def test_missing_default_target_fails_without_output(feeds_dir, tmp_path):
     out = tmp_path / "out"
     assert run(feeds_dir, out) == 1
     assert not (out / "manifest.json").exists()
+
+
+def test_lka_sprinter_route_name(built):
+    con, _, _ = built
+    row = con.execute("SELECT agency, route_short_name FROM trip WHERE agency='LKA'").fetchone()
+    assert tuple(row) == ("LKA", "ŁS")
 
 
 def test_missing_agency_fails(feeds_dir, tmp_path):
