@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "version": "20261031-5bafba8c",
+  "sha256": "496b6697fda9bf2a6457083c35f947114464715becd9fd6c517c767d2811f351",
+  "size_bytes": 1688521,
+  "url": "timetable-20261031-5bafba8c.sqlite.gz",
+  "generated_at": "2026-10-31T02:18:19+00:00",
+  "valid_from": "2026-10-30",
+  "valid_to": "2026-11-14",
+  "sources": {
+    "https://mkuran.pl/gtfs/polish_trains.zip": {
+      "etag": "\"dmhsn7a2gdda-fr78i\"",
+      "last_modified": "Fri, 30 Oct 2026 01:49:24 GMT"
+    },
+    "https://mkuran.pl/gtfs/wkd.zip": {
+      "etag": "\"dmhvg3khh82d-aqql\"",
+      "last_modified": "Fri, 30 Oct 2026 04:01:10 GMT"
+    }
+  }
+}
