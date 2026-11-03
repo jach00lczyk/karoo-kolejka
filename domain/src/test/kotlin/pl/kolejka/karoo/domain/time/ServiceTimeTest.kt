@@ -49,6 +49,15 @@ class ServiceTimeTest {
     }
 
     @Test
+    fun `fall back day departure before service day origin has negative seconds`() {
+        val d = LocalDate.of(2026, 10, 25) // „południe − 12 h" = 01:00 CEST
+        assertEquals(LocalDateTime.of(d, LocalTime.of(0, 30)), local(d, -1800))
+        val from = LocalDateTime.of(d, LocalTime.of(0, 20)).atZone(ServiceTime.ZONE).toInstant()
+        val w = ServiceTime.windows(from, from.plusSeconds(3600)).toMap()
+        assertTrue(-1800 in w.getValue(d))
+    }
+
+    @Test
     fun `round trip seconds and instant`() {
         val d = LocalDate.of(2026, 3, 29)
         val i = ServiceTime.toInstant(d, 40_000)

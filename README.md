@@ -30,8 +30,14 @@ Drugie źródło to GitHub Packages z tokenem `read:packages`. Token wpisz w
 ```bash
 cd pipeline
 uv run --python 3.12 --with-requirements requirements.txt pytest
-uv run --python 3.12 python build_timetable.py --out dist
+PDP_API_KEY=$(security find-generic-password -a "$USER" -s karoo-kolejka-pdp-api-key -w) \
+  uv run --python 3.12 python build_timetable.py --out dist
 ```
+
+Klucz API PDP PLK leży wyłącznie w Keychain (lokalnie) i w sekrecie repo `PDP_API_KEY` (workflow).
+Regulamin API zabrania udostępniania klucza, a repo i APK są publiczne — nigdy nie wpisuj go do
+plików. Gdy Python nie ufa certyfikatowi (proxy z własnym CA), dodaj
+`SSL_CERT_FILE=<eksport certyfikatów systemowych>`.
 
 ## Instalacja na Karoo
 
@@ -40,5 +46,6 @@ rozszerzenia nie zawsze sam się restartuje.
 
 ## Dane
 
-Rozkład: Koleje Mazowieckie, SKM Warszawa, Łódzka Kolej Aglomeracyjna (PKP PLK, warunki ponownego wykorzystania informacji
-sektora publicznego), WKD (CC0). Feed GTFS przygotowuje [Mikołaj Kuranowski](https://mkuran.pl/gtfs/).
+Rozkład Kolei Mazowieckich, SKM Warszawa, Łódzkiej Kolei Aglomeracyjnej i WKD: PKP Polskie Linie
+Kolejowe S.A., [Otwarte Dane Kolejowe](https://pdp-api.plk-sa.pl) (do 3.11.2026: GTFS
+[Mikołaja Kuranowskiego](https://mkuran.pl/gtfs/)).

@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Rozkład z API PDP PKP PLK (2026-11-03, gałąź `pdp-api`)
+
+- Pipeline pobiera rozkład z API Otwarte Dane Kolejowe PKP PLK zamiast z GTFS mkuran.pl:
+  jedno zapytanie na całe okno 16 dni (`/schedules/shortened`, KM + SKM + ŁKA + WKD) i jedno
+  o wersję danych (bez zmian → bez publikacji). Klucz tylko w sekrecie `PDP_API_KEY`.
+- Na danych z 3.11: te same odjazdy, linie i perony co z GTFS (sprawdzone Mińsk, Otwock,
+  Legionowo, Skierniewice, WKD z Podkowy). Perony KM/SKM/ŁKA 100%, WKD 4%. Plik 1,20 MB
+  (było 2,01 MB): identyczne zamówienia (WKD ma osobne na każdy dzień) scalone w jeden kurs.
+- Schemat zgodny wstecz (`schema_version` 1, dopisane kolumny): `trip_date.pdp_sid/pdp_oid`
+  (do opóźnień), `trip.train_no`, bit `stop_time.flags & 4` = odjazd autobusem ZKA (peron „BUS";
+  KM oznacza tak częściową komunikację zastępczą, np. „R61/Z61" → linia „R61").
+- Czasy przeliczane na „południe − 12 h" (SPEC 6.7) także w dni zmiany czasu; w nocy cofania
+  zegara odjazd przed 01:00 ma ujemną liczbę sekund — `ServiceTime.windows` już tego nie obcina.
+- **ID stacji WKD zmieniają się** na ID PLK (np. Śródmieście WKD 14357927 → 35006). Domyślne
+  cele przeliczą się same; ręcznie dodane stacje WKD w Opcjach trzeba dodać ponownie.
+- Grupowanie bliźniaków: promień 700 m (Śródmieście ↔ Śródmieście WKD to wg PLK 628 m).
+- Domyślne cele: dopisane Warszawa Zachodnia i Warszawa Centralna (po Śródmieściu).
+
 ### Rozkład: dodana ŁKA (2026-10-26)
 
 - Pipeline: przewoźnik Łódzka Kolej Aglomeracyjna (`LKA`; linie Ł, ŁP, **ŁS Sprinter**, ZKA)

@@ -23,11 +23,11 @@ Rozszerzenie karoo-ext, które:
 
 ### 1.1 Dane: preprocessing w chmurze, nie na Karoo
 
-Źródła (Mikołaj Kuranowski, mkuran.pl):
-- `https://mkuran.pl/gtfs/polish_trains.zip` — zawiera m.in. **Koleje Mazowieckie i SKM Warszawa**; aktualizowany codziennie. (Osobny feed KM został wycofany na rzecz tego pliku.)
-- `https://mkuran.pl/gtfs/wkd.zip` — **WKD**, licencja CC0.
+Źródło (od 3.11.2026): **API Otwarte Dane Kolejowe PKP PLK** (`https://pdp-api.plk-sa.pl`, klucz w nagłówku `X-API-Key`, pakiet Basic: 100 zapytań/h, 1000/dobę). `/api/v1/schedules/shortened` z `carriersInclude=KM,SKM,ŁKA,WKD&fullRoute=true` zwraca całe okno 16 dni w jednym zapytaniu (~4 MB gzip, ~23 MB JSON) razem ze słownikiem stacji (ID PLK, współrzędne). Peron/tor przy 100% postojów KM, SKM i ŁKA; ZKA oznaczona peronem „BUS". Do 3.11.2026 źródłem był GTFS mkuran.pl (`polish_trains.zip` + `wkd.zip`).
 
-`polish_trains.zip` ma **~29,5 MB spakowany / ~111 MB rozpakowany** (cała Polska). Pobieranie i parsowanie tego na Karoo = duży transfer (bez Wi-Fi Karoo idzie przez mostek Bluetooth z telefonem, który ma bardzo niską przepustowość), duże zużycie CPU/RAM/baterii, ryzyko OOM.
+Klucz API: regulamin zabrania udostępniania go osobom trzecim, a repo i APK są publiczne → klucz **tylko** w sekrecie repo `PDP_API_KEY` (workflow) i w Keychain na komputerze właściciela; nigdy w plikach, logach ani w URL.
+
+Surowe dane to kilkadziesiąt MB JSON-u. Pobieranie i parsowanie tego na Karoo = duży transfer (bez Wi-Fi Karoo idzie przez mostek Bluetooth z telefonem, który ma bardzo niską przepustowość), duże zużycie CPU/RAM/baterii, ryzyko OOM.
 
 **Decyzja:** codzienny job w GitHub Actions filtruje dane i publikuje:
 - `manifest.json` (~300 B) — wersja, sha256, rozmiar, zakres dat,
@@ -97,7 +97,9 @@ Kotlin, coroutines + Flow, Jetpack Compose (aplikacja), Glance/RemoteViews (kafe
 ## 3. Pipeline danych (`pipeline/build_timetable.py`)
 
 ### 3.1 Wejście
-- `polish_trains.zip` i `wkd.zip` (warunkowe pobranie `If-Modified-Since`/ETag; oba niezmienione → koniec bez publikacji).
+- `/api/v1/data-version` → `schedulesVersion`; ta sama wersja co w poprzednim manifeście i dane ważne jeszcze ≥ 12 dni → koniec bez publikacji (1 zapytanie).
+- W przeciwnym razie `/api/v1/schedules/shortened` na okno dat (sekcja 3.3). Razem ≤ 2 zapytania na przebieg, 4xx bez ponowień.
+- Szczegóły mapowania (scalanie identycznych zamówień, `trip_date.pdp_sid/pdp_oid`, flaga ZKA, czasy w dni zmiany czasu) — docstring `build_timetable.py`.
 
 ### 3.2 Filtrowanie i scalanie
 1. `agency.txt` z `polish_trains` → agencje **KM** i **SKM Warszawa** znalezione po nazwie (zaloguj ID; brak którejś → błąd, bez publikacji). Z `wkd.zip` → wszystko. Prefiksuj ID źródłem (`pt:`, `wkd:`), żeby nie było kolizji.
@@ -486,7 +488,7 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 ### Backlog (świadomie później / nie teraz)
 - **Później:** „Plan B" — kafelek z najbliższą stacją od bieżącej pozycji GPS; `InRideAlert` („przechodzę na 18:12", „do odjazdu 15 min"); stacje jako symbole na mapie (`startMap` + `ShowSymbols`); `BonusAction` pod przycisk.
 - **Gdyby rozszerzenie miało być udostępniane:** informacje o przewozie roweru (ZKA zwykle bez rowerów, WKD z płatnym biletem na rower, ew. pole `bikes_allowed`), wielojęzyczność, konfiguracja regionu.
-- **Nie robimy:** opóźnienia na żywo.
+- **W toku (gałąź `pdp-api`):** opóźnienia na żywo z `/api/v1/operations/train/{sid}/{oid}/{data}` (~6 KB na pociąg, mieści się w 100 KB `MakeHttpRequest`) — tylko dla pociągów z kafelka, automatycznie co 10 min przy aktywnym kafelku i odjeździe w ciągu ~90 min, plus przycisk „Sprawdź opóźnienia"; wymaga wpisu w 7.3/11 przed implementacją. Klucz na Karoo wgrywany przez adb, nigdy w APK.
 
 ---
 
@@ -523,7 +525,8 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 
 - karoo-ext: https://github.com/hammerheadnav/karoo-ext , https://hammerheadnav.github.io/karoo-ext/
 - karoo-ext issue #81: https://github.com/hammerheadnav/karoo-ext/issues/81
-- GTFS (Polish Trains, WKD, Warszawa): https://mkuran.pl/gtfs/
+- API Otwarte Dane Kolejowe PKP PLK: https://pdp-api.plk-sa.pl (Swagger: `/swagger/index.html`, regulamin: `/api/v1/terms`)
+- GTFS (Polish Trains, WKD, Warszawa; źródło do 3.11.2026): https://mkuran.pl/gtfs/
 - Rozmiar feedu Polish Trains: https://mobilitydatabase.org/feeds/gtfs/mdb-3191
 - Headwind (changelogi): https://github.com/timklge/karoo-headwind/releases
 - RouteGraph (changelogi): https://github.com/timklge/karoo-routegraph/releases
