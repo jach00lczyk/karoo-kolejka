@@ -44,6 +44,19 @@ plików. Gdy Python nie ufa certyfikatowi (proxy z własnym CA), dodaj
 `adb install -r app-release.apk`. **Po każdej aktualizacji zrestartuj Karoo**, bo serwis
 rozszerzenia nie zawsze sam się restartuje.
 
+### Opóźnienia na żywo (klucz API)
+
+Klucza nie ma w APK (repo jest publiczne). Wgraj go raz, z Keychain prosto na Karoo:
+
+```bash
+security find-generic-password -a "$USER" -s karoo-kolejka-pdp-api-key -w | tr -d '\n' > /tmp/pdp_api_key.txt
+adb push /tmp/pdp_api_key.txt /sdcard/Android/data/pl.kolejka.karoo/files/ && rm /tmp/pdp_api_key.txt
+```
+
+Aplikacja przy najbliższym sprawdzeniu przenosi klucz do pamięci prywatnej i usuwa plik
+z katalogu zewnętrznego (w logu: „Zaimportowano klucz API PDP”). Bez klucza wszystko działa
+na rozkładzie planowym, a zakładka Meta mówi, że opóźnienia są wyłączone.
+
 ## Dane
 
 Rozkład Kolei Mazowieckich, SKM Warszawa, Łódzkiej Kolei Aglomeracyjnej i WKD: PKP Polskie Linie

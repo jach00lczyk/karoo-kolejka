@@ -326,6 +326,11 @@ Wynik to lista: najbliższy **DO ZŁAPANIA** (jeśli jest) + główny **PEWNY** 
 ### 6.8 Polyline
 Własny dekoder Google Encoded Polyline z parametrem precyzji (+ testy). Uproszczenie Douglas-Peucker (20 m) przed obliczeniami geo.
 
+### 6.8a Opóźnienia
+- Kurs w bazie ma `trip_date.pdp_sid/pdp_oid`; API zwraca dla każdej stacji `actualArrival/actualDeparture` (potwierdzone `isConfirmed` albo prognoza) i `isCancelled`.
+- Oczekiwany odjazd = max(planowy, z API) — pociąg nie odjeżdża przed czasem. Klasyfikacja „zdążę?" (6.4) liczona od oczekiwanego odjazdu; kurs odwołany na stacji odjazdu lub celu → ODPADA i nigdy nie jest głównym (histereza go nie trzyma).
+- Wyświetlanie: planowy odjazd + „+N" (N ≥ 1 min), „ODWOŁANY" zamiast zapasu.
+
 ### 6.9 Stany wyniku (każdy ma widok kafelka)
 `NoRoute`, `Computing`, `NoStationNearFinish(odległośćDoNajbliższej, stacjePoDrodze)`, `NoTrainsToday`, `LastTrainMissed(...)`, `AlreadyAtTarget`, `DataMissing`, `DataStale(wiek)`, `Ok(trains, flags)`.
 
@@ -383,6 +388,14 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 - `etaMinute` = ETA obcięte do pełnej minuty + `distinctUntilChanged`.
 - Tik raz na minutę (przeliczenie zapasu/`v_req`) tylko gdy widok aktywny.
 - Strumień prędkości subskrybowany tylko przy wariancie szerokim.
+- **Opóźnienia na żywo (od 3.11.2026)** — jedyny polling, i to bez własnego timera: przy każdym
+  przeliczeniu z minutowego tiku `DelayPolicy` sprawdza, czy pociągi pokazane na kafelku
+  (▲ ● ○, ostatni z mety, plan B) mają odjazd w ciągu 90 min i dane starsze niż 10 min; jeśli tak
+  — `GET /api/v1/operations/train/{sid}/{oid}/{data}` (~3–6 KB) przez `MakeHttpRequest` Karoo
+  (działa przez mostek z telefonem; awaryjnie bezpośrednio). Kafelek nieaktywny i aplikacja
+  zamknięta → zero zapytań. Twardy limit 30 zapytań/h na urządzenie (pakiet Basic: 100/h).
+  Przycisk „Sprawdź opóźnienia" na zakładce Meta: do 4 najbliższych pociągów, nie częściej niż
+  raz na minutę na pociąg. Dane starsze niż 30 min są ignorowane (wraca rozkład planowy).
 - Brak innych timerów i pollingu.
 
 ### 7.4 Kliknięcie
@@ -453,7 +466,7 @@ Przykładowe GPX w repo: trasa kończąca się przy stacji KM, przy stacji WKD, 
 
 ## 11. Stabilność i energia — reguły twarde
 
-1. Zero pracy w tle poza: jednorazowe sprawdzenie aktualizacji, subskrypcje potrzebne aktywnym widokom/aplikacji oraz `OnNavigationState` (lekki, potrzebny do powiadomienia).
+1. Zero pracy w tle poza: jednorazowe sprawdzenie aktualizacji, subskrypcje potrzebne aktywnym widokom/aplikacji, `OnNavigationState` (lekki, potrzebny do powiadomienia) oraz opóźnienia z 7.3 (tylko przy aktywnym kafelku lub otwartej aplikacji).
 2. Strumienie ETA/dystansu/prędkości tylko gdy jest trasa **i** (aktywny kafelek **lub** otwarta aplikacja **lub** oczekujące powiadomienie); współdzielone `shareIn(WhileSubscribed(5_000))`.
 3. Żadnych `GlobalScope`, `runBlocking` w ścieżkach UI/serwisu, żadnych pętli z `delay` poza minutowym tikiem z 7.3.
 4. Baza otwierana raz, read-only; kursory w `use {}`.
@@ -461,6 +474,7 @@ Przykładowe GPX w repo: trasa kończąca się przy stacji KM, przy stacji WKD, 
 6. Każdy null/NaN/0/ujemna wartość z Karoo obsłużone.
 7. Logi: plik z rotacją (2 × 256 KB), INFO; DEBUG tylko w debug.
 8. Uprawnienia: `INTERNET`, `ACCESS_NETWORK_STATE` (+ `RECEIVE_BOOT_COMPLETED` tylko jeśli faza 0 tego wymaga).
+10. Klucz API PDP na Karoo: plik `pdp_api_key.txt` wgrany przez `adb push` do `Android/data/<pakiet>/files/`; przy starcie przenoszony do pamięci prywatnej aplikacji i usuwany z katalogu zewnętrznego. Nigdy w APK, `BuildConfig`, logach ani URL. Bez klucza aplikacja działa na samym rozkładzie.
 9. R8/minify w release; reguły keep dla kotlinx.serialization i karoo-ext.
 
 ---
@@ -488,7 +502,7 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 ### Backlog (świadomie później / nie teraz)
 - **Później:** „Plan B" — kafelek z najbliższą stacją od bieżącej pozycji GPS; `InRideAlert` („przechodzę na 18:12", „do odjazdu 15 min"); stacje jako symbole na mapie (`startMap` + `ShowSymbols`); `BonusAction` pod przycisk.
 - **Gdyby rozszerzenie miało być udostępniane:** informacje o przewozie roweru (ZKA zwykle bez rowerów, WKD z płatnym biletem na rower, ew. pole `bikes_allowed`), wielojęzyczność, konfiguracja regionu.
-- **W toku (gałąź `pdp-api`):** opóźnienia na żywo z `/api/v1/operations/train/{sid}/{oid}/{data}` (~6 KB na pociąg, mieści się w 100 KB `MakeHttpRequest`) — tylko dla pociągów z kafelka, automatycznie co 10 min przy aktywnym kafelku i odjeździe w ciągu ~90 min, plus przycisk „Sprawdź opóźnienia"; wymaga wpisu w 7.3/11 przed implementacją. Klucz na Karoo wgrywany przez adb, nigdy w APK.
+- **W toku (gałąź `pdp-api`):** opóźnienia na żywo — zasady w 7.3 i 11.10.
 
 ---
 

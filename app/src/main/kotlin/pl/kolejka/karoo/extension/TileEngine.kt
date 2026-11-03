@@ -17,7 +17,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import pl.kolejka.karoo.data.DelayRepository
 import pl.kolejka.karoo.data.SqliteTimetable
+import pl.kolejka.karoo.domain.delay.TrainRun
 import pl.kolejka.karoo.domain.geo.Polyline
 import pl.kolejka.karoo.domain.geo.RouteAnalyzer
 import pl.kolejka.karoo.domain.geo.RouteGeometry
@@ -25,6 +27,8 @@ import pl.kolejka.karoo.domain.geo.SpatialIndex
 import pl.kolejka.karoo.domain.karoo.KarooUnits
 import pl.kolejka.karoo.domain.model.Settings
 import pl.kolejka.karoo.domain.model.TargetGroups
+import pl.kolejka.karoo.domain.model.Train
+import pl.kolejka.karoo.domain.model.TrainRef
 import pl.kolejka.karoo.domain.plan.EtaEstimator
 import pl.kolejka.karoo.domain.plan.KarooEtaSample
 import pl.kolejka.karoo.domain.plan.RideProgress
@@ -46,13 +50,15 @@ import kotlin.math.roundToLong
  * Łączy nawigację, strumienie Karoo, rozkład, ustawienia i planer w model kafelka (SPEC 7.3).
  * Nowy rozkład (po aktualizacji) lub zmiana ustawień budują potok od nowa. Strumienie
  * ETA/dystansu są subskrybowane tylko przy trasie i aktywnym kafelku (`WhileSubscribed`,
- * SPEC 11.2). Jedyny timer: tik minutowy przy trasie.
+ * SPEC 11.2). Jedyny timer: tik minutowy przy trasie — on też wyzwala sprawdzanie opóźnień
+ * pociągów z kafla ([DelayRepository.onShown], SPEC 7.3).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TileEngine(
     private val source: KarooSource,
     timetables: Flow<SqliteTimetable?>,
     settings: Flow<Settings>,
+    private val delays: DelayRepository,
     private val clock: Clock,
     scope: CoroutineScope,
 ) {
@@ -94,12 +100,11 @@ class TileEngine(
                             flowOf(TileModel(TileState.NoRoute, stationName = nameOf))
                         }
                         is RouteState.Computing -> flowOf(TileModel(TileState.Computing, stationName = nameOf))
-                        is RouteState.Ready -> combine(rawStreams(), minuteTicker()) { raw, _ -> raw }
-                            // Przeliczaj tylko przy istotnej zmianie wejścia (SPEC 7.3).
-                            .map { it to inputKey(it) }
-                            .distinctUntilChanged { a, b -> a.second == b.second }
+                        is RouteState.Ready -> combine(rawStreams(), minuteTicker(), delays.runs) { raw, _, runs -> Triple(raw, runs, inputKey(raw)) }
+                            // Przeliczaj tylko przy istotnej zmianie wejścia lub nowych opóźnieniach (SPEC 7.3).
+                            .distinctUntilChanged { a, b -> a.third == b.third && a.second === b.second }
                             .conflate()
-                            .map { (raw, _) -> compute(rs, raw) }
+                            .map { (raw, runs, _) -> compute(rs, raw, runs) }
                             .flowOn(Dispatchers.Default)
                     }
                 }
@@ -121,7 +126,7 @@ class TileEngine(
             return g
         }
 
-        private fun compute(rs: RouteState.Ready, raw: RawStreams): TileModel = try {
+        private fun compute(rs: RouteState.Ready, raw: RawStreams, runs: Map<TrainRef, TrainRun>): TileModel = try {
             val now = clock.instant()
             val routeDistance = (rs.input as? NavInput.Route)?.routeDistanceM ?: rs.geometry.lengthM
             // Karoo potrafi na chwilę zgubić pole dystansu (log 25.10) — przytrzymaj ostatnią wartość
@@ -134,9 +139,10 @@ class TileEngine(
             if (karooEta != null) lastKarooEta = KarooEtaSample(karooEta, now)
             val progress = RideProgress(remaining, karooEta, lastKarooEta, KarooUnits.speedMps(raw.averageSpeed))
             val state = stabilizer.apply(
-                planner.plan(rs.geometry, routeDistance, progress, settings, targets, tt.dataStatus),
+                planner.plan(rs.geometry, routeDistance, progress, settings, targets, tt.dataStatus, runs),
                 now,
             )
+            delays.onShown(shownTrains(state))
             val finishEta = EtaEstimator.finishEta(
                 now, progress.karooEta, progress.lastKarooEta, remaining, routeDistance, progress.movingAvgSpeedMps, settings.fallbackSpeedKmh,
             )
@@ -155,6 +161,13 @@ class TileEngine(
             FileLog.e("Błąd obliczeń kafelka", e)
             TileModel(TileState.Computing, stationName = nameOf)
         }
+    }
+
+    /** Pociągi widoczne na kafelku — tylko o nie pytamy API (SPEC 7.3). */
+    private fun shownTrains(state: TileState): List<Train> = when (state) {
+        is TileState.Ok -> state.display.map { it.train } + listOfNotNull(state.safePlan?.train)
+        is TileState.LastTrainMissed -> listOfNotNull(state.lastFromFinish?.train, state.alternative?.train)
+        else -> emptyList()
     }
 
     private fun rawStreams(): Flow<RawStreams> = combine(

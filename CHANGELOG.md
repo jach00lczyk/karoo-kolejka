@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Opóźnienia na żywo (2026-11-03, gałąź `pdp-api`, wersja 0.3.0)
+
+- Kafelek i zakładka Meta pokazują opóźnienie przy planowym odjeździe („17:42 +6") i
+  „ODWOŁANY". „Zdążę?" liczy się od oczekiwanego odjazdu (nigdy wcześniejszego niż planowy);
+  odwołany kurs odpada i histereza go nie trzyma. Dane starsze niż 30 min są ignorowane.
+- Źródło: `/api/v1/operations/train/{sid}/{oid}/{data}` (czasy potwierdzone lub prognoza PLK
+  na każdej stacji, 3–6 KB), przez `MakeHttpRequest` Karoo, awaryjnie bezpośrednio.
+- Bez nowego timera (SPEC 7.3): sprawdza minutowy tik kafla — pociągi z kafelka z odjazdem
+  w ciągu 90 min, co 10 min; przy niewidocznym kafelku i zamkniętej aplikacji zero zapytań.
+  Limit 30 zapytań/h. Przycisk „Sprawdź opóźnienia" (Meta): do 4 pociągów, raz na minutę.
+- Klucz API wgrywany przez `adb push` (README), przenoszony do pamięci prywatnej; nigdy w APK
+  ani w logach. Ze starym rozkładem (GTFS, bez ID zamówień) opóźnienia po prostu się nie pokazują.
+- Kurs częściowo zastępczy: 🚌 przy odjeździe ze stacji obsługiwanej autobusem (`flags & 4`).
+- Domena: `TrainRun` (parser odpowiedzi), `DelayPolicy` (kiedy pytać, limit), opóźnienia
+  w `TrainPlanner`/`TileStabilizer`/`TileText`; +17 testów. Bez nowych zależności.
+- **Nie sprawdzone na Karoo** — do zmierzenia w docs/device-findings.md (nagłówek przez
+  `MakeHttpRequest`, mostek BT).
+
 ### Rozkład z API PDP PKP PLK (2026-11-03, gałąź `pdp-api`)
 
 - Pipeline pobiera rozkład z API Otwarte Dane Kolejowe PKP PLK zamiast z GTFS mkuran.pl:

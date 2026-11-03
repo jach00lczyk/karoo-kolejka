@@ -41,6 +41,19 @@ data class Connection(
     val routeShortName: String?,
     val headsign: String?,
     val isBus: Boolean,
+    /** Kurs w API PDP (do opóźnień); null w starszych rozkładach (GTFS). */
+    val ref: TrainRef? = null,
+)
+
+/** Kurs w API PDP PLK: `scheduleId` + `orderId` + dzień kursowania (SPEC 6.8a). */
+data class TrainRef(val sid: Int, val oid: Long, val serviceDate: LocalDate)
+
+/** Czasy z API PDP dla stacji odjazdu i celu kursu, w chwili [checkedAt]. */
+data class LiveTimes(
+    val departure: Instant?,
+    val arrival: Instant?,
+    val cancelled: Boolean,
+    val checkedAt: Instant,
 )
 
 /** Pociąg z czasami bezwzględnymi i etykietą celu (najwyżej położona obsługiwana grupa). */
@@ -60,8 +73,21 @@ data class Train(
     val labelArrival: Instant,
     /** Najwcześniejszy przyjazd do dowolnej grupy celów. */
     val earliestArrival: Instant,
+    val ref: TrainRef? = null,
+    /** Opóźnienie z API; null = brak danych (rozkład planowy). */
+    val live: LiveTimes? = null,
 ) {
     val key: TrainKey get() = TrainKey(tripId, serviceDate, fromStationId)
+
+    /** Oczekiwany odjazd: nie wcześniej niż planowy (pociąg nie odjeżdża przed czasem). */
+    val expectedDeparture: Instant
+        get() = live?.departure?.takeIf { it.isAfter(departure) } ?: departure
+
+    /** Opóźnienie odjazdu w pełnych minutach (zaokrąglone), 0 bez danych. */
+    val delayMin: Int
+        get() = ((java.time.Duration.between(departure, expectedDeparture).seconds + 30) / 60).toInt()
+
+    val cancelled: Boolean get() = live?.cancelled == true
 }
 
 data class TrainKey(val tripId: Int, val serviceDate: LocalDate, val fromStationId: Int)

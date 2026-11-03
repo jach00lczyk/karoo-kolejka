@@ -11,21 +11,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.kolejka.karoo.AppContainer
 import pl.kolejka.karoo.R
 import pl.kolejka.karoo.domain.plan.FinishBoard
 import pl.kolejka.karoo.domain.plan.TrainClass
 import pl.kolejka.karoo.domain.text.TileText
+import pl.kolejka.karoo.log.FileLog
 
 /** Zakładka „Meta" (SPEC 8.1). */
 @Composable
@@ -55,9 +60,10 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
     }
     var selected by remember(ctx.geometry) { mutableIntStateOf(0) }
     val candidate = candidates[selected.coerceIn(candidates.indices)]
-    val board by produceState<FinishBoard?>(null, ctx, candidate) {
+    val runs by AppContainer.delays.runs.collectAsStateWithLifecycle()
+    val board by produceState<FinishBoard?>(null, ctx, candidate, runs) {
         value = withContext(Dispatchers.IO) {
-            planner.finishBoard(candidate, ctx.routeDistanceM, ctx.progress, ctx.settings, ctx.targets, count = 8)
+            planner.finishBoard(candidate, ctx.routeDistanceM, ctx.progress, ctx.settings, ctx.targets, count = 8, runs = runs)
         }
     }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -73,6 +79,7 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
             item { Hint(stringResource(R.string.ready_at, TileText.hm(b.ready))) }
         }
         item { ActionButton(stringResource(R.string.navigate_to_station)) { AppContainer.source.navigateTo(candidate.station) } }
+        board?.let { b -> item { DelayControls(b) } }
         if (candidates.size > 1) {
             item { SectionTitle(stringResource(R.string.candidates)) }
             items(candidates.withIndex().toList()) { (i, c) ->
@@ -91,3 +98,44 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
         }
     }
 }
+
+/** „Sprawdź opóźnienia" (SPEC 7.3) i stan ostatniego sprawdzenia. */
+@Composable
+private fun DelayControls(board: FinishBoard) {
+    val status by AppContainer.delays.status.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val nothingToCheck = stringResource(R.string.delays_nothing_to_check)
+    if (!status.hasKey) {
+        Hint(stringResource(R.string.delays_no_key))
+        return
+    }
+    SecondaryButton(
+        stringResource(if (checking) R.string.delays_checking else R.string.delays_check),
+        Modifier.fillMaxWidth(),
+        enabled = !checking,
+    ) {
+        checking = true
+        message = null
+        scope.launch {
+            // Wyjątek w scope UI zabiłby też serwis (wspólny proces, docs/device-findings.md).
+            try {
+                val n = AppContainer.delays.refreshNow(board.options.filter { it.cls != TrainClass.MISSED }.map { it.train })
+                if (n == 0) message = nothingToCheck
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                FileLog.e("Sprawdzanie opóźnień", e)
+            } finally {
+                checking = false
+            }
+        }
+    }
+    val info = listOfNotNull(
+        status.lastSuccess?.let { stringResource(R.string.delays_checked_at, TileText.hm(it)) },
+        status.lastError?.let { stringResource(R.string.delays_error, it) },
+        message,
+    )
+    if (info.isNotEmpty()) Hint(info.joinToString(" · "))
+}
+

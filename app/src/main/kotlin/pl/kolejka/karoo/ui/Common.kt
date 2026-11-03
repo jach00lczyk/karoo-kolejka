@@ -136,7 +136,7 @@ fun TrainRow(train: Train, data: AppData, option: TrainOption? = null, isMain: B
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                listOfNotNull(mark, "${TileText.hm(train.departure)} → ${TileText.hm(train.labelArrival)}").joinToString(" "),
+                listOfNotNull(mark, "${TileText.dep(train)} → ${TileText.hm(train.labelArrival)}").joinToString(" "),
                 fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color,
             )
         }
@@ -163,6 +163,7 @@ object TileTextMarks {
     }
 
     fun detail(o: TrainOption, isMain: Boolean): String = when {
+        o.train.cancelled -> TileText.CANCELLED
         o.cls == TrainClass.CATCHABLE && !isMain -> "potrzeba ${o.vReqKmh?.let { Math.round(it) } ?: "?"} km/h"
         o.cls == TrainClass.MISSED -> "odpada"
         else -> "zapas ${o.slack.toMinutes()} min"

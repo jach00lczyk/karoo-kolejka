@@ -47,6 +47,12 @@
     <string name="ready_at">Na peronie gotowy ok. %1$s</string>
     <string name="no_trains">Brak pociągów do celów do końca dnia</string>
     <string name="candidates">Stacje przy mecie</string>
+    <string name="delays_check">Sprawdź opóźnienia</string>
+    <string name="delays_checking">Sprawdzam opóźnienia…</string>
+    <string name="delays_checked_at">Opóźnienia sprawdzone o %1$s</string>
+    <string name="delays_error">błąd: %1$s</string>
+    <string name="delays_nothing_to_check">Brak pociągów do sprawdzenia albo sprawdzone przed chwilą</string>
+    <string name="delays_no_key">Opóźnienia wyłączone: brak klucza API PDP (instrukcja w README)</string>
 
     <!-- Po drodze -->
     <string name="no_stations_on_route">Brak stacji ≤ %1$s od trasy</string>

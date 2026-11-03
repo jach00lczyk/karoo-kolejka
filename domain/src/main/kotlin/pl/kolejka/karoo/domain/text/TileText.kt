@@ -52,6 +52,14 @@ object TileText {
 
     fun hm(i: Instant): String = HM.format(i)
 
+    /** Planowy odjazd z opóźnieniem z API: „17:42 +6" ([tight]: „17:42+6"); SPEC 6.8a. */
+    fun dep(t: Train, tight: Boolean = false): String {
+        val delay = t.delayMin.takeIf { it >= 1 && !t.cancelled }?.let { if (tight) "+$it" else " +$it" }.orEmpty()
+        return hm(t.departure) + delay
+    }
+
+    const val CANCELLED = "ODWOŁANY"
+
     fun lines(m: TileModel, compact: Boolean): List<TileLine> = lines(m, if (compact) TileLayout.COMPACT else TileLayout.WIDE)
 
     fun lines(m: TileModel, layout: TileLayout): List<TileLine> {
@@ -78,7 +86,7 @@ object TileText {
         }
         is TileState.LastTrainMissed -> buildList {
             val last = s.lastFromFinish?.train
-            add(TileLine(if (last != null) "$WARNING Ostatni z ${short(s.station, compact)} ${hm(last.departure)} — nie zdążysz" else "$WARNING Nie zdążysz na ostatni", Emphasis.ALERT))
+            add(TileLine(if (last != null) "$WARNING Ostatni z ${short(s.station, compact)} ${dep(last)} — nie zdążysz" else "$WARNING Nie zdążysz na ostatni", Emphasis.ALERT))
             s.alternative?.let { add(TileLine("Zjedź: ${short(it.station, compact)} ${hm(it.train.departure)} (km ${(it.alongM / 1000).roundToInt()})", Emphasis.ALERT)) }
             addAll(upcomingFor(m, compact, tall))
         }
@@ -97,7 +105,7 @@ object TileText {
         for (o in s.display) {
             val r = row(o, o === s.main)
             val t = o.train
-            add(TileLine("${r.mark} ${hm(t.departure)} → ${hm(t.labelArrival)}", r.emphasis))
+            add(TileLine("${r.mark} ${dep(t)} → ${hm(t.labelArrival)}", r.emphasis))
             val details = listOfNotNull(BUS.takeIf { t.isBus }, platformText(t), r.detail)
             add(TileLine(details.joinToString(" · "), r.emphasis.takeIf { it != Emphasis.NORMAL } ?: Emphasis.DIM, LineSize.SMALL, badge = "OSTATNI".takeIf { o.isLast }))
         }
@@ -146,9 +154,9 @@ object TileText {
         val approx = if (s.etaApproximate || s.dataStale) " ≈" else ""
         if (compact) {
             return listOf(
-                TileLine("${hm(main.departure)}→${hm(main.labelArrival)}", if (s.main.slack.toMinutes() < 5) Emphasis.WARN else Emphasis.NORMAL),
+                TileLine("${dep(main, tight = true)}→${hm(main.labelArrival)}", if (s.main.slack.toMinutes() < 5) Emphasis.WARN else Emphasis.NORMAL),
                 TileLine("${NameShortener.tiny(s.station.name)}→${NameShortener.tiny(m.stationName(main.labelStationId))}$approx"),
-            ) + s.next?.let { listOf(TileLine("$NEXT ${hm(it.train.departure)}", Emphasis.DIM)) }.orEmpty()
+            ) + s.next?.let { listOf(TileLine("$NEXT ${dep(it.train, tight = true)}", Emphasis.DIM)) }.orEmpty()
         }
         val platform = platformText(main)?.let { "  $it" }.orEmpty()
         return buildList {
@@ -170,6 +178,7 @@ object TileText {
             TrainClass.MISSED -> MISSED
         }
         val detail = when {
+            o.train.cancelled -> CANCELLED
             !isMain && o.cls == TrainClass.CATCHABLE -> "potrzeba ${o.vReqKmh?.roundToInt() ?: "?"} km/h"
             o.cls == TrainClass.MISSED && !isMain -> "odpada"
             else -> "zapas ${o.slack.toMinutes()} min"
@@ -187,7 +196,7 @@ object TileText {
         val t = o.train
         val r = row(o, isMain)
         val flags = listOfNotNull(BUS.takeIf { t.isBus }, "OSTATNI".takeIf { o.isLast }).joinToString(" ")
-        return TileLine("${r.mark} ${hm(t.departure)}→${hm(t.labelArrival)}  ${r.detail}${if (flags.isNotEmpty()) "  $flags" else ""}", r.emphasis)
+        return TileLine("${r.mark} ${dep(t, tight = true)}→${hm(t.labelArrival)}  ${r.detail}${if (flags.isNotEmpty()) "  $flags" else ""}", r.emphasis)
     }
 
     private fun upcomingFor(m: TileModel, compact: Boolean, tall: Boolean) = if (tall) upcomingTall(m) else upcoming(m, compact)

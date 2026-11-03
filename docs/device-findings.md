@@ -56,6 +56,8 @@ Procedura:
 | `ViewConfig` dla używanych rozmiarów pól | Pół szerokości `(30,12)` → 240×128 px, textSize 46. Pełna szerokość `(60,12)` → 478×128 px w podglądzie, **478×144 px w jeździe** (wysokość się różni!), textSize 55. `preview` = true w edytorze, false w jeździe. | `PROBE startView config=` (24.10, 20:16) |
 | Czy pole renderuje się z tytułem mimo `showHeader=false` (P2) | | |
 | Long-press na polu w edytorze profilu przy `preview=true` (P3) | | |
+| Opóźnienia (0.3.0): czy `MakeHttpRequest` przekazuje nagłówek `X-API-Key` (w logu `Opóźnienie GET … → 200`, a nie 401) — Wi-Fi i mostek BT | | |
+| Opóźnienia: czas odpowiedzi przez mostek BT (~3–6 KB) i liczba zapytań na godzinę jazdy (cel ≤ 18) | | |
 
 ## C. Inne obserwacje
 
