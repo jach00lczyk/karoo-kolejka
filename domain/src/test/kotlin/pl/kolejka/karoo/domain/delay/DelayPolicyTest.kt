@@ -63,4 +63,14 @@ class DelayPolicyTest {
         assertEquals(1, p.dueAutomatic(trains, t0).size)
         assertEquals(0, p.dueAutomatic(trains, t0.minusSeconds(30)).size)
     }
+
+    @Test
+    fun `manual candidates tell nothing to check from checked a moment ago`() {
+        val p = DelayPolicy()
+        assertEquals(false, p.hasManualCandidates(listOf(train(1, 200), train(null, 30)), t0))
+        val soon = listOf(train(1, 30))
+        assertEquals(1, p.dueManual(soon, t0).size)
+        assertEquals(0, p.dueManual(soon, t0.plusSeconds(20)).size)
+        assertEquals(true, p.hasManualCandidates(soon, t0.plusSeconds(20)))
+    }
 }

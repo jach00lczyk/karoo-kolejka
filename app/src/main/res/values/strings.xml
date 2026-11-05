@@ -52,8 +52,11 @@
     <string name="delays_check">Sprawdź opóźnienia</string>
     <string name="delays_checking">Sprawdzam opóźnienia…</string>
     <string name="delays_checked_at">Opóźnienia sprawdzone o %1$s</string>
-    <string name="delays_error">błąd: %1$s</string>
-    <string name="delays_nothing_to_check">Brak pociągów do sprawdzenia albo sprawdzone przed chwilą</string>
+    <string name="delays_error">Nie udało się sprawdzić: %1$s</string>
+    <string name="delays_error_partial">Sprawdzono %1$d z %2$d pociągów, reszta: %3$s</string>
+    <string name="delays_done">Sprawdzono pociągów: %1$d</string>
+    <string name="delays_no_trains">Nic do sprawdzenia: żaden pociąg nie odjeżdża w ciągu 3 h</string>
+    <string name="delays_too_soon">Sprawdzone przed chwilą — spróbuj za minutę</string>
     <string name="delays_no_key">Opóźnienia wyłączone: brak klucza API PDP (instrukcja w README)</string>
 
     <!-- Po drodze -->

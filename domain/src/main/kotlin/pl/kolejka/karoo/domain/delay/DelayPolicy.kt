@@ -37,6 +37,10 @@ class DelayPolicy(
     fun dueManual(trains: List<Train>, now: Instant): List<TrainRef> =
         take(candidates(trains, now, manualHorizon).take(manualLimit).filter { isOlderThan(it, manualCooldown, now) }, now)
 
+    /** Czy przycisk ma w ogóle o co pytać (pociąg z ID kursu w ciągu 3 h) — do rozróżnienia komunikatów. */
+    @Synchronized
+    fun hasManualCandidates(trains: List<Train>, now: Instant): Boolean = candidates(trains, now, manualHorizon).isNotEmpty()
+
     /** Ile zapytań zostało w bieżącej godzinie. */
     @Synchronized
     fun budget(now: Instant): Int {

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Komunikaty sprawdzania opóźnień (2026-11-05)
+
+- Przycisk „Sprawdź opóźnienia" rozróżnia: nic do sprawdzenia (brak pociągu w ciągu 3 h),
+  sprawdzone przed chwilą, sukces (liczba pociągów) i błąd z powodem (brak połączenia, klucz
+  odrzucony, limit, błąd serwera) — błąd na czerwono. Wcześniej „brak pociągów" wyglądał jak błąd.
+
 ### Kafelek po próbach na Karoo, odwrócona trasa (2026-11-05, gałąź `pdp-api`)
 
 - **Błąd: odwrócona trasa liczyła metę na złym końcu.** Karoo przy `reversed=true` podaje tę samą
