@@ -74,6 +74,16 @@ class RouteTrackerTest {
     }
 
     @Test
+    fun `reversed route is ridden from the last point to the first`() {
+        val enc = pl.kolejka.karoo.domain.geo.Polyline.encode(listOf(LatLon(52.0, 21.0), LatLon(52.1, 21.1), LatLon(52.2, 21.2)), 5)
+        val forward = NavInput.Route(enc, 30_000.0, reversed = false).ridePoints(5)
+        val back = NavInput.Route(enc, 30_000.0, reversed = true).ridePoints(5)
+        assertEquals(52.2, forward.last().lat, 1e-6)
+        assertEquals(52.0, back.last().lat, 1e-6)
+        assertEquals(forward.reversed(), back)
+    }
+
+    @Test
     fun `reversed route is a new route`() = runTest {
         val h = Harness(this, config)
         h.nav.value = routeA; settle()

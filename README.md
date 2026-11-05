@@ -55,7 +55,7 @@ adb push /tmp/pdp_api_key.txt /sdcard/Android/data/pl.kolejka.karoo/files/ && rm
 
 Aplikacja przy najbliższym sprawdzeniu przenosi klucz do pamięci prywatnej i usuwa plik
 z katalogu zewnętrznego (w logu: „Zaimportowano klucz API PDP”). Bez klucza wszystko działa
-na rozkładzie planowym, a zakładka Meta mówi, że opóźnienia są wyłączone.
+na rozkładzie planowym, a zakładka Finisz mówi, że opóźnienia są wyłączone.
 
 ## Dane
 

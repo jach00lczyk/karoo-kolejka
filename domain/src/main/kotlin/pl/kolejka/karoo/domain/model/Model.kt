@@ -99,7 +99,7 @@ data class Settings(
     val finishRadiusM: Double = 1000.0,
     val routeRadiusM: Double = 1000.0,
     val accessSpeedKmh: Double = 15.0,
-    val bufferMin: Int = 5,
+    val bufferMin: Int = 2,
     val fallbackSpeedKmh: Double = 25.0,
     val vMaxKmh: Double = 30.0,
     val mode: PreferenceMode = PreferenceMode.FASTEST,

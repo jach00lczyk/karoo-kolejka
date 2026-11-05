@@ -19,9 +19,10 @@ class DelayPolicy(
     private val manualHorizon: Duration = Duration.ofHours(3),
     /** Pociąg, który właśnie odjechał (wg oczekiwanego odjazdu), jeszcze nas interesuje. */
     private val recentPast: Duration = Duration.ofMinutes(5),
-    private val maxPerHour: Int = 30,
+    /** Kafel: do 3 pociągów z mety + plan B + 2 stacje po drodze, co 10 min (pakiet Basic: 100/h). */
+    private val maxPerHour: Int = 40,
     private val manualCooldown: Duration = Duration.ofMinutes(1),
-    private val manualLimit: Int = 4,
+    private val manualLimit: Int = 6,
 ) {
     private val lastFetch = HashMap<TrainRef, Instant>()
     private val requests = ArrayDeque<Instant>()

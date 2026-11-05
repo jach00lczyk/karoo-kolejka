@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Kafelek po próbach na Karoo, odwrócona trasa (2026-11-05, gałąź `pdp-api`)
+
+- **Błąd: odwrócona trasa liczyła metę na złym końcu.** Karoo przy `reversed=true` podaje tę samą
+  polyline co bez odwrócenia (log 25.10: te same pierwszy/ostatni punkt, dystans do celu 8 → 39 km);
+  wniosek z fazy 0 był błędny. Punkty odwracamy sami (`NavInput.Route.ridePoints`). Objaw: trasa
+  Sochaczew ↔ Imielin odwrócona nie pokazywała pociągów z Sochaczewa.
+- **Błąd: Glance rysuje w jednej kolumnie najwyżej 10 linii** i resztę pomija bez ostrzeżenia —
+  ucinało stacje po drodze. Linie w zagnieżdżonych kolumnach; przy braku miejsca odcinamy całe
+  bloki (stacja + ETA + pociąg), nie pojedyncze linie.
+- Wygląd (uzgodniony na urządzeniu): znaki ● żółty / ● zielony / ○ niebieski / ✕ czerwony zamiast
+  emoji, opóźnienie „+N" na czerwono, jeden rozmiar czcionki dla wszystkich linii z godzinami,
+  „ETA" zamiast 🚲, peron w nawiasie „[P2/t4]", kreska między metą a stacjami po drodze,
+  czytelny układ „Nie zdążysz → Zjedź: …". W pierwszym wierszu po prawej „⏱ N'" (wiek opóźnień;
+  na czerwonym kafelku białe).
+- Nazwy „skąd → dokąd" skracane tylko, gdy się nie mieszczą: najpierw Warszawa („W-wa Gdańska" →
+  „W-wa Gd."), potem stacja startowa. Szerokość tekstu szacowana osobno dla liter, cyfr i spacji.
+- Aplikacja: zakładka „Meta" → „Finisz"; przycisk „Sprawdź opóźnienia" widoczny zawsze, a brak
+  klucza API widać od razu. Dotknięcie fragmentu kafelka Karoo nie przekazuje (sprawdzone), więc
+  ręczne odświeżanie tylko z aplikacji.
+- Opóźnienia także dla pociągów ze stacji po drodze (kafel i zakładka „Po drodze"); limit 40/h,
+  przycisk w aplikacji sprawdza do 6 pociągów, także tych ze stacji po drodze.
+- Domyślny zapas na peronie 2 min (było 5); zapisane ustawienia się nie zmieniają.
+- Tryb demo kafelka (tylko debug): 8 zmyślonych scenariuszy, przełączanie z adb lub w Opcjach.
+- Log kafla zawiera dystans i kilometr stacji po drodze (zgłoszony podejrzany dystans do Żyrardowa).
+
 ### Opóźnienia na żywo (2026-11-03, gałąź `pdp-api`, wersja 0.3.0)
 
 - Kafelek i zakładka Meta pokazują opóźnienie przy planowym odjeździe („17:42 +6") i

@@ -72,7 +72,8 @@ class TrainPlannerTest {
         eta: Instant?,
         remainingM: Double = 10_000.0,
         trips: List<TripData> = baseTrips,
-        settings: Settings = Settings(),
+        // Scenariusze liczone przy zapasie 5 min (domyślny do 5.11.2026; teraz 2 min).
+        settings: Settings = Settings(bufferMin = 5),
         geometry: RouteGeometry = geometry(),
         dataStatus: DataStatus? = data,
         runs: Map<TrainRef, TrainRun> = emptyMap(),
@@ -84,6 +85,27 @@ class TrainPlannerTest {
     private fun ref(oid: Long) = TrainRef(2026, oid, day)
     private fun run(oid: Long, from: Int, dep: Instant?, fetchedAt: Instant, status: String = "P", cancelledFrom: Boolean = false) =
         ref(oid) to TrainRun(ref(oid), status, listOf(RunStop(from, dep, dep, confirmed = false, cancelled = cancelledFrom)), fetchedAt)
+
+    @Test
+    fun `stations on route use live delays and skip cancelled trains`() {
+        // 18:30, meta 19:30, zostało 30 km (v = 30 km/h): Sulejówek (20 km) ok. 18:50 → T4 19:00;
+        // Halinów (35 km) ok. 19:20 → T5 19:10 planowo nieosiągalny, ale opóźniony o 20 min.
+        val trips = baseTrips.map { it.copy(pdpOid = 100L + it.id) }
+        val now = at(18, 30)
+        val planner = TrainPlanner(InMemoryTimetable(allStations, trips), clock(now))
+        val runs = mapOf(
+            run(104, 20, at(19, 0), now.minusSeconds(60), cancelledFrom = true),
+            run(105, 21, at(19, 30), now.minusSeconds(60)),
+        )
+        val up = UpcomingStations(planner, clock(now)).compute(
+            geometry(), 40_000.0, RideProgress(30_000.0, at(19, 30)), Eta(at(19, 30), false), Settings(bufferMin = 5), targets,
+            limit = 2, runs = runs,
+        )
+        assertEquals(listOf(20, 21), up.map { it.station.id })
+        assertNull(up[0].train)
+        assertEquals(5, up[1].train!!.tripId)
+        assertEquals(20, up[1].train!!.delayMin)
+    }
 
     @Test
     fun `delayed earlier train becomes sure main`() {

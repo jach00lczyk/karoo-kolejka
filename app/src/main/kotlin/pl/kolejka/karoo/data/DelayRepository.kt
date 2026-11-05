@@ -23,7 +23,13 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /** Stan opóźnień dla ekranów: czy jest klucz, kiedy ostatnio się udało, ostatni błąd. */
-data class DelayStatus(val hasKey: Boolean = true, val lastSuccess: Instant? = null, val lastError: String? = null)
+data class DelayStatus(
+    val hasKey: Boolean = true,
+    val lastSuccess: Instant? = null,
+    val lastError: String? = null,
+    /** Trwa pobieranie (kafelek pokazuje „⏱ …"). */
+    val refreshing: Boolean = false,
+)
 
 /**
  * Opóźnienia na żywo z API PDP PLK (SPEC 6.8a, 7.3). Bez własnego timera: [onShown] woła silnik
@@ -69,11 +75,24 @@ class DelayRepository(
         return due.size
     }
 
+    /** Sprawdza, czy jest klucz API (ekran Finisz od razu pokazuje „brak klucza"). */
+    suspend fun checkKey(): Boolean = key() != null
+
     private suspend fun key(): String? = withContext(Dispatchers.IO) { keys.key() }
         .also { k -> _status.update { it.copy(hasKey = k != null) } }
 
     private suspend fun fetchAll(refs: List<TrainRef>) = withContext(Dispatchers.IO) {
         val key = keys.key() ?: return@withContext
+        if (refs.isEmpty()) return@withContext
+        _status.update { it.copy(refreshing = true) }
+        try {
+            fetchEach(refs, key)
+        } finally {
+            _status.update { it.copy(refreshing = false) }
+        }
+    }
+
+    private suspend fun fetchEach(refs: List<TrainRef>, key: String) {
         for (ref in refs) {
             if (!inFlight.add(ref)) continue
             try {

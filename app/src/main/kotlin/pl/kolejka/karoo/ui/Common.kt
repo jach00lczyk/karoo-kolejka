@@ -21,7 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +42,7 @@ import pl.kolejka.karoo.domain.plan.TrainOption
 import pl.kolejka.karoo.domain.plan.TrainPlanner
 import pl.kolejka.karoo.domain.text.NameShortener
 import pl.kolejka.karoo.domain.text.TileText
+import pl.kolejka.karoo.domain.text.Tint
 import java.time.Clock
 
 /** Zakładki aplikacji (SPEC 8); kafelek otwiera właściwą przez extra [EXTRA_TAB] (SPEC 7.4). */
@@ -135,10 +139,15 @@ fun TrainRow(train: Train, data: AppData, option: TrainOption? = null, isMain: B
     val mark = option?.let { TileTextMarks.mark(it, isMain) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                listOfNotNull(mark, "${TileText.dep(train)} → ${TileText.hm(train.labelArrival)}").joinToString(" "),
-                fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color,
-            )
+            // Te same znaki i kolory co na kafelku: ▲ żółty, ● zielony, ○ niebieski, ✕ czerwony, +N czerwone.
+            val text = buildAnnotatedString {
+                if (mark != null && option != null) withStyle(SpanStyle(color = TileTextMarks.color(option, isMain))) { append("$mark ") }
+                for (seg in TileText.depSegs(train)) {
+                    if (seg.tint != null) withStyle(SpanStyle(color = BADGE)) { append(seg.text) } else append(seg.text)
+                }
+                append(" → ${TileText.hm(train.labelArrival)}")
+            }
+            Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
         }
         val details = listOfNotNull(
             NameShortener.short(data.name(train.labelStationId), 18),
@@ -156,10 +165,18 @@ fun TrainRow(train: Train, data: AppData, option: TrainOption? = null, isMain: B
 
 /** Te same znaki i opisy co na kafelku (TileText), żeby aplikacja i kafel mówiły jednym językiem. */
 object TileTextMarks {
-    fun mark(o: TrainOption, isMain: Boolean): String = when (o.cls) {
-        TrainClass.SURE -> if (!isMain) TileText.NEXT else if (o.slack.toMinutes() < 5) TileText.WARNING else TileText.SURE
-        TrainClass.CATCHABLE -> TileText.CATCHABLE
-        TrainClass.MISSED -> TileText.MISSED
+    fun mark(o: TrainOption, isMain: Boolean): String = when {
+        o.cls == TrainClass.MISSED || o.train.cancelled -> TileText.MISSED
+        o.cls == TrainClass.CATCHABLE -> TileText.CATCHABLE
+        isMain -> TileText.SURE
+        else -> TileText.NEXT
+    }
+
+    fun color(o: TrainOption, isMain: Boolean): Color = when (TileText.tintOf(o, isMain)) {
+        Tint.YELLOW -> WARN
+        Tint.GREEN -> Color(0xFF34D058)
+        Tint.BLUE -> Color(0xFF4DA3FF)
+        Tint.RED -> BADGE
     }
 
     fun detail(o: TrainOption, isMain: Boolean): String = when {

@@ -35,12 +35,12 @@ class DelayPolicyTest {
     }
 
     @Test
-    fun `manual check takes up to four nearest trains with one minute cooldown`() {
+    fun `manual check takes up to six nearest trains with one minute cooldown`() {
         val p = DelayPolicy()
-        val trains = (1L..6L).map { train(it, it * 20) }
-        assertEquals(listOf(1L, 2L, 3L, 4L), p.dueManual(trains, t0).oids())
+        val trains = (1L..8L).map { train(it, it * 20) }
+        assertEquals((1L..6L).toList(), p.dueManual(trains, t0).oids())
         assertEquals(emptyList<Long>(), p.dueManual(trains, t0.plusSeconds(30)).oids())
-        assertEquals(listOf(1L, 2L, 3L, 4L), p.dueManual(trains, min(1)).oids())
+        assertEquals((1L..6L).toList(), p.dueManual(trains, min(1)).oids())
         // automat nie dubluje świeżo sprawdzonych
         assertEquals(emptyList<Long>(), p.dueAutomatic(trains, min(2)).oids())
     }

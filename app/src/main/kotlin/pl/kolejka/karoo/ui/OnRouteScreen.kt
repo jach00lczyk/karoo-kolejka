@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -47,11 +48,12 @@ fun OnRouteScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
         }
         return
     }
-    val stations by produceState<List<UpcomingStation>?>(null, ctx) {
+    val runs by AppContainer.delays.runs.collectAsStateWithLifecycle()
+    val stations by produceState<List<UpcomingStation>?>(null, ctx, runs) {
         value = withContext(Dispatchers.IO) {
             UpcomingStations(planner, Clock.systemUTC()).compute(
                 ctx.geometry, ctx.routeDistanceM, ctx.progress, ctx.finishEta, ctx.settings, ctx.targets,
-                limit = 50, trainsPerStation = 4, includePassed = true,
+                limit = 50, trainsPerStation = 4, includePassed = true, runs = runs,
             )
         }
     }

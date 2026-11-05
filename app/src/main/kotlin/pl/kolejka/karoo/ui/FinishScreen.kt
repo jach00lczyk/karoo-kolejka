@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.kolejka.karoo.AppContainer
 import pl.kolejka.karoo.R
+import pl.kolejka.karoo.domain.model.Train
 import pl.kolejka.karoo.domain.plan.FinishBoard
 import pl.kolejka.karoo.domain.plan.TrainClass
 import pl.kolejka.karoo.domain.text.TileText
@@ -42,6 +44,8 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
             item { SectionTitle(stringResource(R.string.no_route)) }
             item { Hint(stringResource(R.string.no_route_hint)) }
             item { ActionButton(stringResource(R.string.go_all_stations)) { onOpenTab(Tab.ALL) } }
+            // Przycisk zawsze widoczny (uzgodnione 5.11); bez trasy zwykle nie ma czego sprawdzać.
+            item { DelayControls { AppContainer.engine.shownTrains } }
         }
         return
     }
@@ -55,6 +59,7 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
             if (ctx.geometry.stationsOnRoute.isNotEmpty()) {
                 item { ActionButton(stringResource(R.string.go_on_route)) { onOpenTab(Tab.ON_ROUTE) } }
             }
+            item { DelayControls { AppContainer.engine.shownTrains } }
         }
         return
     }
@@ -79,7 +84,8 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
             item { Hint(stringResource(R.string.ready_at, TileText.hm(b.ready))) }
         }
         item { ActionButton(stringResource(R.string.navigate_to_station)) { AppContainer.source.navigateTo(candidate.station) } }
-        board?.let { b -> item { DelayControls(b) } }
+        // Pociągi z tablicy mety i z kafla (także ze stacji po drodze); polityka bierze najbliższe.
+        item { DelayControls { board?.options?.filter { it.cls != TrainClass.MISSED }?.map { it.train }.orEmpty() + AppContainer.engine.shownTrains } }
         if (candidates.size > 1) {
             item { SectionTitle(stringResource(R.string.candidates)) }
             items(candidates.withIndex().toList()) { (i, c) ->
@@ -101,8 +107,9 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
 
 /** „Sprawdź opóźnienia" (SPEC 7.3) i stan ostatniego sprawdzenia. */
 @Composable
-private fun DelayControls(board: FinishBoard) {
+private fun DelayControls(trains: () -> List<Train>) {
     val status by AppContainer.delays.status.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { runCatching { AppContainer.delays.checkKey() } }
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -121,7 +128,7 @@ private fun DelayControls(board: FinishBoard) {
         scope.launch {
             // Wyjątek w scope UI zabiłby też serwis (wspólny proces, docs/device-findings.md).
             try {
-                val n = AppContainer.delays.refreshNow(board.options.filter { it.cls != TrainClass.MISSED }.map { it.train })
+                val n = AppContainer.delays.refreshNow(trains())
                 if (n == 0) message = nothingToCheck
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e

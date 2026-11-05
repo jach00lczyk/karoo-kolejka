@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.withContext
 import pl.kolejka.karoo.domain.geo.LatLon
+import pl.kolejka.karoo.domain.geo.Polyline
 import pl.kolejka.karoo.domain.geo.RouteGeometry
 
 /** Stan nawigacji Karoo przetłumaczony na model domeny (bez typów karoo-ext). */
@@ -28,6 +29,14 @@ sealed interface NavInput {
 
     data class Destination(val destination: LatLon, val polyline: String) : NavInput
 }
+
+/**
+ * Punkty trasy w kierunku jazdy (ostatni = meta). Karoo przy `reversed=true` podaje **tę samą**
+ * polyline co bez odwrócenia — odwracamy sami (log 25.10: te same pierwszy/ostatni punkt,
+ * DISTANCE_TO_DESTINATION skoczył z 8 na 39 km; potwierdzone trasą Sochaczew ↔ Imielin 31.10).
+ */
+fun NavInput.Route.ridePoints(precision: Int): List<LatLon> =
+    Polyline.decode(polyline, precision).let { if (reversed) it.asReversed() else it }
 
 /**
  * Klucz trasy (SPEC 5.1): polyline + reversed + typ nawigacji + cel pinezki. Porównanie dokładne

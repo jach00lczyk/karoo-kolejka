@@ -276,7 +276,7 @@ Po pierwszym `Ready` dla nowego `routeKey` (raz na trasę, dedup po `routeKey`):
 
 1. **Meta** = ostatni punkt w kierunku jazdy (`reversed` wg fazy 0); dla `NavigatingToDestination` = współrzędne celu.
 2. **Kandydaci** = stacje ≤ `R_meta` (domyślnie 1000 m). Siatka przestrzenna (~0,02°) + haversine.
-3. Dla kandydata: `t_ready = ETA_meta + dist(meta, stacja) / v_dojazd + zapas` (`v_dojazd` = 15 km/h, `zapas` = 5 min; ustawialne).
+3. Dla kandydata: `t_ready = ETA_meta + dist(meta, stacja) / v_dojazd + zapas` (`v_dojazd` = 15 km/h, `zapas` = 2 min — do 5.11.2026 było 5; ustawialne).
 4. Zapytanie: odjazdy ze stacji w oknie `[t_ready − 30 min, t_ready + 3 h]`, których kurs później zatrzymuje się w którejś grupie celów; dla każdego: odjazd, przyjazd, etykieta celu, linia, `is_bus`, peron/tor.
 5. **Główny pociąg** = pierwszy z odjazdem ≥ `t_ready`. Wybór kandydata: najwcześniejszy przyjazd do celu; remis → bliższa stacja.
 6. Tryb preferencji (ustawienie): **Najszybciej** (domyślny) lub **Ścisła preferencja** (najwyższa grupa, chyba że jej pociąg jest > X min, domyślnie 30, później niż najszybsza opcja).
@@ -390,12 +390,16 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 - Strumień prędkości subskrybowany tylko przy wariancie szerokim.
 - **Opóźnienia na żywo (od 3.11.2026)** — jedyny polling, i to bez własnego timera: przy każdym
   przeliczeniu z minutowego tiku `DelayPolicy` sprawdza, czy pociągi pokazane na kafelku
-  (▲ ● ○, ostatni z mety, plan B) mają odjazd w ciągu 90 min i dane starsze niż 10 min; jeśli tak
+  (do złapania, główny, następny, ostatni z mety, plan B oraz pierwszy pociąg z 2 stacji po drodze)
+  mają odjazd w ciągu 90 min i dane starsze niż 10 min; jeśli tak
   — `GET /api/v1/operations/train/{sid}/{oid}/{data}` (~3–6 KB) przez `MakeHttpRequest` Karoo
   (działa przez mostek z telefonem; awaryjnie bezpośrednio). Kafelek nieaktywny i aplikacja
-  zamknięta → zero zapytań. Twardy limit 30 zapytań/h na urządzenie (pakiet Basic: 100/h).
-  Przycisk „Sprawdź opóźnienia" na zakładce Meta: do 4 najbliższych pociągów, nie częściej niż
-  raz na minutę na pociąg. Dane starsze niż 30 min są ignorowane (wraca rozkład planowy).
+  zamknięta → zero zapytań. Twardy limit 40 zapytań/h na urządzenie (pakiet Basic: 100/h).
+  Ręcznie tylko przyciskiem „Sprawdź opóźnienia" w zakładce Finisz, widoczny także bez trasy (dotknięcie elementu na kafelku
+  Karoo nie przekazuje — 5.11): do 6 najbliższych pociągów, raz na minutę na pociąg. Dane starsze
+  niż 30 min są ignorowane (wraca rozkład planowy). Kafelek pokazuje w pierwszym wierszu, po prawej,
+  „⏱ N'" — ile minut temu udało się pobrać opóźnienia (szare < 15, żółte < 30, potem czerwone;
+  „⏱ —" gdy jeszcze ani razu); bez zasięgu liczba rośnie.
 - Brak innych timerów i pollingu.
 
 ### 7.4 Kliknięcie
@@ -407,7 +411,7 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 
 Ekrany pod 480×800, cele dotyku ≥ 48 dp, wysoki kontrast, bez animacji. Dane z tego samego repozytorium co kafelek (jedna instancja w procesie).
 
-### 8.1 Zakładka „Meta" (aktywna tylko przy trasie z metą przy stacji)
+### 8.1 Zakładka „Finisz" (do 5.11 „Meta"; aktywna tylko przy trasie z metą przy stacji)
 - Nagłówek: stacja, odległość od mety, ETA mety (źródło: Karoo / ≈).
 - **Przycisk „Prowadź do stacji"** → `LaunchPinDrop(POI stacji)`.
 - Lista następnych 8 pociągów do celów: odjazd, przyjazd, cel, linia, peron/tor, ZKA, klasa (PEWNY / DO ZŁAPANIA + `v_req` / ODPADA wyszarzone), OSTATNI.

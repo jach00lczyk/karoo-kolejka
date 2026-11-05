@@ -41,6 +41,7 @@ import pl.kolejka.karoo.domain.route.GeometryConfig
 import pl.kolejka.karoo.domain.route.NavInput
 import pl.kolejka.karoo.domain.route.RouteState
 import pl.kolejka.karoo.domain.route.RouteTracker
+import pl.kolejka.karoo.domain.route.ridePoints
 import pl.kolejka.karoo.domain.text.TileModel
 import pl.kolejka.karoo.log.FileLog
 import java.time.Clock
@@ -67,9 +68,13 @@ class TileEngine(
     /** Kontekst trasy z ostatniego obliczenia — dla ekranów aplikacji; null bez trasy. */
     val routeContext: StateFlow<RouteContext?> get() = _routeContext
 
-    val model: StateFlow<TileModel> = combine(timetables, settings) { tt, s -> tt to s }
+    private val real: Flow<TileModel> = combine(timetables, settings) { tt, s -> tt to s }
         .distinctUntilChanged()
         .flatMapLatest { (tt, s) -> if (tt == null) flowOf(TileModel(TileState.DataMissing)) else Pipeline(tt, s).models() }
+
+    /** Prawdziwy model albo — w debug, po włączeniu z adb/Opcji — scenariusz demo ([DemoScenarios]). */
+    val model: StateFlow<TileModel> = DemoScenarios.current
+        .flatMapLatest { demo -> if (demo != null) flowOf(DemoScenarios.model(demo, clock.instant())) else real }
         .distinctUntilChanged()
         .stateIn(scope, SharingStarted.WhileSubscribed(5_000), TileModel(TileState.Computing))
 
@@ -100,11 +105,11 @@ class TileEngine(
                             flowOf(TileModel(TileState.NoRoute, stationName = nameOf))
                         }
                         is RouteState.Computing -> flowOf(TileModel(TileState.Computing, stationName = nameOf))
-                        is RouteState.Ready -> combine(rawStreams(), minuteTicker(), delays.runs) { raw, _, runs -> Triple(raw, runs, inputKey(raw)) }
-                            // Przeliczaj tylko przy istotnej zmianie wejścia lub nowych opóźnieniach (SPEC 7.3).
-                            .distinctUntilChanged { a, b -> a.third == b.third && a.second === b.second }
+                        is RouteState.Ready -> combine(rawStreams(), minuteTicker(), delays.runs, delays.status) { raw, _, runs, st -> Input(raw, runs, st, inputKey(raw)) }
+                            // Przeliczaj tylko przy istotnej zmianie wejścia lub opóźnień (SPEC 7.3).
+                            .distinctUntilChanged { a, b -> a.key == b.key && a.runs === b.runs && a.status == b.status }
                             .conflate()
-                            .map { (raw, runs, _) -> compute(rs, raw, runs) }
+                            .map { compute(rs, it.raw, it.runs) }
                             .flowOn(Dispatchers.Default)
                     }
                 }
@@ -112,15 +117,14 @@ class TileEngine(
         private fun analyze(input: NavInput, cfg: GeometryConfig): RouteGeometry? {
             val g = when (input) {
                 NavInput.Idle -> null
-                // Faza 0 (25.10): przy reversed=true Karoo podaje polyline już w kierunku jazdy —
-                // ostatni punkt to meta. Nie odwracamy.
+                // Przy reversed=true Karoo NIE odwraca polyline — robi to ridePoints (docs/device-findings.md).
                 is NavInput.Route ->
-                    RouteAnalyzer.analyze(Polyline.decode(input.polyline, PRECISION), index, cfg.finishRadiusM, cfg.routeRadiusM)
+                    RouteAnalyzer.analyze(input.ridePoints(PRECISION), index, cfg.finishRadiusM, cfg.routeRadiusM)
                 is NavInput.Destination ->
                     RouteAnalyzer.analyze(Polyline.decode(input.polyline, PRECISION), index, cfg.finishRadiusM, cfg.routeRadiusM, destination = input.destination)
             }
             FileLog.i(
-                "Geometria: meta=${g?.finish}, kandydaci=${g?.finishCandidates?.map { "${it.station.name}@${it.distanceM.toInt()}m" }}, " +
+                "Geometria: reversed=${(input as? NavInput.Route)?.reversed}, meta=${g?.finish}, kandydaci=${g?.finishCandidates?.map { "${it.station.name}@${it.distanceM.toInt()}m" }}, " +
                     "po drodze=${g?.stationsOnRoute?.map { "${it.station.name}@km${(it.occurrencesM.first() / 1000).toInt()}" }}",
             )
             return g
@@ -142,26 +146,49 @@ class TileEngine(
                 planner.plan(rs.geometry, routeDistance, progress, settings, targets, tt.dataStatus, runs),
                 now,
             )
-            delays.onShown(shownTrains(state))
             val finishEta = EtaEstimator.finishEta(
                 now, progress.karooEta, progress.lastKarooEta, remaining, routeDistance, progress.movingAvgSpeedMps, settings.fallbackSpeedKmh,
             )
-            val next = upcoming.compute(rs.geometry, routeDistance, progress, finishEta, settings, targets, limit = 2)
+            val next = upcoming.compute(rs.geometry, routeDistance, progress, finishEta, settings, targets, limit = 2, runs = runs)
+            val shown = shownTrains(state) + next.mapNotNull { it.train }
+            lastShown = shown
+            delays.onShown(shown)
             // Log przy zmianie typu stanu, a poza tym co 5 min.
             val kind = state.javaClass.simpleName
             if (kind != lastLoggedState || clock.millis() - lastLogAt > 300_000) {
-                FileLog.i("Kafelek: $kind eta=$finishEta remaining=$remaining raw=$raw upcoming=${next.map { it.station.name }}")
+                FileLog.i("Kafelek: $kind eta=$finishEta remaining=$remaining raw=$raw upcoming=${next.map { "${it.station.name}@${(it.distanceM / 100).toInt() / 10.0}km(km${(it.alongM / 1000).toInt()})" }}")
                 lastLoggedState = kind
                 lastLogAt = clock.millis()
             }
             _routeContext.value = RouteContext(rs.geometry, routeDistance, progress.copy(remainingM = remaining), finishEta, settings, targets, state)
             // Bez DISTANCE_TO_DESTINATION (np. przed ruszeniem) dystans z długości trasy, jak przy stacjach po drodze.
-            TileModel(state, next, nameOf, finishEta, remaining ?: routeDistance, clickable = settings.tileClickable)
+            TileModel(
+                state, next, nameOf, finishEta, remaining ?: routeDistance, clickable = settings.tileClickable,
+                delayAgeMin = delayAge(shown, now), delayRefreshing = delays.status.value.refreshing,
+            )
         } catch (e: Exception) {
             FileLog.e("Błąd obliczeń kafelka", e)
             TileModel(TileState.Computing, stationName = nameOf)
         }
     }
+
+    /**
+     * Ile minut temu pobrano opóźnienia — do pastylki ⏱ na kafelku (np. bez zasięgu w telefonie
+     * liczba rośnie). Null, gdy opóźnień nie ma o co pytać (brak klucza, stary rozkład bez ID kursów).
+     */
+    private fun delayAge(shown: List<Train>, now: java.time.Instant): Long? {
+        val status = delays.status.value
+        if (!status.hasKey || shown.none { it.ref != null }) return null
+        val last = status.lastSuccess ?: return TileModel.NEVER
+        return java.time.Duration.between(last, now).toMinutes().coerceAtLeast(0)
+    }
+
+    @Volatile private var lastShown: List<Train> = emptyList()
+
+    /** Pociągi z ostatniego przeliczenia kafla (z metą i stacjami po drodze) — dla przycisku w aplikacji. */
+    val shownTrains: List<Train> get() = lastShown
+
+    private data class Input(val raw: RawStreams, val runs: Map<TrainRef, TrainRun>, val status: pl.kolejka.karoo.data.DelayStatus, val key: List<Long?>)
 
     /** Pociągi widoczne na kafelku — tylko o nie pytamy API (SPEC 7.3). */
     private fun shownTrains(state: TileState): List<Train> = when (state) {
