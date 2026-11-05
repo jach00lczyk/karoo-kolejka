@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.kolejka.karoo.AppContainer
 import pl.kolejka.karoo.R
+import pl.kolejka.karoo.data.RefreshResult
 import pl.kolejka.karoo.domain.model.Train
 import pl.kolejka.karoo.domain.plan.FinishBoard
 import pl.kolejka.karoo.domain.plan.TrainClass
@@ -105,15 +106,14 @@ fun FinishScreen(data: AppData, onOpenTab: (Tab) -> Unit) {
     }
 }
 
-/** „Sprawdź opóźnienia" (SPEC 7.3) i stan ostatniego sprawdzenia. */
+/** „Sprawdź opóźnienia" (SPEC 7.3) i stan ostatniego sprawdzenia; błąd na czerwono, reszta szaro. */
 @Composable
 private fun DelayControls(trains: () -> List<Train>) {
     val status by AppContainer.delays.status.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { runCatching { AppContainer.delays.checkKey() } }
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    val nothingToCheck = stringResource(R.string.delays_nothing_to_check)
+    var result by remember { mutableStateOf<RefreshResult?>(null) }
     if (!status.hasKey) {
         Hint(stringResource(R.string.delays_no_key))
         return
@@ -124,25 +124,37 @@ private fun DelayControls(trains: () -> List<Train>) {
         enabled = !checking,
     ) {
         checking = true
-        message = null
+        result = null
         scope.launch {
             // Wyjątek w scope UI zabiłby też serwis (wspólny proces, docs/device-findings.md).
-            try {
-                val n = AppContainer.delays.refreshNow(trains())
-                if (n == 0) message = nothingToCheck
+            result = try {
+                AppContainer.delays.refreshNow(trains())
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 FileLog.e("Sprawdzanie opóźnień", e)
+                RefreshResult.Done(checked = 1, ok = 0, error = e.message ?: e.javaClass.simpleName)
             } finally {
                 checking = false
             }
         }
     }
-    val info = listOfNotNull(
-        status.lastSuccess?.let { stringResource(R.string.delays_checked_at, TileText.hm(it)) },
-        status.lastError?.let { stringResource(R.string.delays_error, it) },
-        message,
-    )
-    if (info.isNotEmpty()) Hint(info.joinToString(" · "))
+    when (val r = result) {
+        RefreshResult.NoTrains -> Hint(stringResource(R.string.delays_no_trains))
+        RefreshResult.TooSoon -> Hint(stringResource(R.string.delays_too_soon))
+        is RefreshResult.Done -> when {
+            r.error == null -> Hint(stringResource(R.string.delays_done, r.ok))
+            r.ok == 0 -> ErrorText(stringResource(R.string.delays_error, r.error))
+            else -> ErrorText(stringResource(R.string.delays_error_partial, r.ok, r.checked, r.error))
+        }
+        RefreshResult.NoKey, null -> {
+            // Bez świeżego wyniku: ostatni błąd automatu (np. brak zasięgu) też na czerwono.
+            status.lastError?.let { ErrorText(stringResource(R.string.delays_error, it)) }
+        }
+    }
+    status.lastSuccess?.let { Hint(stringResource(R.string.delays_checked_at, TileText.hm(it))) }
 }
 
+@Composable
+private fun ErrorText(text: String) {
+    Text(text, color = BADGE, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+}

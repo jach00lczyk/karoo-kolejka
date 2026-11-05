@@ -22,6 +22,16 @@ import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
+/** Wynik przycisku „Sprawdź opóźnienia" — każdy przypadek ma inny komunikat. */
+sealed interface RefreshResult {
+    data object NoKey : RefreshResult
+    /** Żaden pociąg (z ID kursu) nie odjeżdża w ciągu 3 h — nie ma o co pytać. */
+    data object NoTrains : RefreshResult
+    /** Wszystkie sprawdzone przed chwilą (limit raz na minutę) lub wyczerpany limit godzinowy. */
+    data object TooSoon : RefreshResult
+    data class Done(val checked: Int, val ok: Int, val error: String?) : RefreshResult
+}
+
 /** Stan opóźnień dla ekranów: czy jest klucz, kiedy ostatnio się udało, ostatni błąd. */
 data class DelayStatus(
     val hasKey: Boolean = true,
@@ -67,12 +77,16 @@ class DelayRepository(
         }
     }
 
-    /** Przycisk „Sprawdź opóźnienia": zwraca liczbę sprawdzonych pociągów (0 = nic do sprawdzenia lub brak klucza). */
-    suspend fun refreshNow(trains: List<Train>): Int {
-        if (key() == null) return 0
-        val due = policy.dueManual(trains, clock.instant())
-        fetchAll(due)
-        return due.size
+    /** Przycisk „Sprawdź opóźnienia". */
+    suspend fun refreshNow(trains: List<Train>): RefreshResult {
+        if (key() == null) return RefreshResult.NoKey
+        val now = clock.instant()
+        val due = policy.dueManual(trains, now)
+        if (due.isEmpty()) {
+            return if (policy.hasManualCandidates(trains, now)) RefreshResult.TooSoon else RefreshResult.NoTrains
+        }
+        val (ok, error) = fetchAll(due)
+        return RefreshResult.Done(due.size, ok, error)
     }
 
     /** Sprawdza, czy jest klucz API (ekran Finisz od razu pokazuje „brak klucza"). */
@@ -81,9 +95,10 @@ class DelayRepository(
     private suspend fun key(): String? = withContext(Dispatchers.IO) { keys.key() }
         .also { k -> _status.update { it.copy(hasKey = k != null) } }
 
-    private suspend fun fetchAll(refs: List<TrainRef>) = withContext(Dispatchers.IO) {
-        val key = keys.key() ?: return@withContext
-        if (refs.isEmpty()) return@withContext
+    /** Zwraca (ile się udało, ostatni błąd). */
+    private suspend fun fetchAll(refs: List<TrainRef>): Pair<Int, String?> = withContext(Dispatchers.IO) {
+        val key = keys.key() ?: return@withContext 0 to "brak klucza API"
+        if (refs.isEmpty()) return@withContext 0 to null
         _status.update { it.copy(refreshing = true) }
         try {
             fetchEach(refs, key)
@@ -92,21 +107,27 @@ class DelayRepository(
         }
     }
 
-    private suspend fun fetchEach(refs: List<TrainRef>, key: String) {
+    private suspend fun fetchEach(refs: List<TrainRef>, key: String): Pair<Int, String?> {
+        var ok = 0
+        var lastError: String? = null
         for (ref in refs) {
             if (!inFlight.add(ref)) continue
-            try {
+            val error = try {
                 fetch(ref, key)
             } catch (e: Exception) {
                 FileLog.w("Opóźnienie ${ref.sid}/${ref.oid}: błąd", e)
-                _status.update { it.copy(lastError = e.message ?: e.javaClass.simpleName) }
+                e.message ?: e.javaClass.simpleName
             } finally {
                 inFlight.remove(ref)
             }
+            if (error == null) ok++ else lastError = error
         }
+        if (lastError != null) _status.update { it.copy(lastError = lastError) }
+        return ok to lastError
     }
 
-    private suspend fun fetch(ref: TrainRef, key: String) {
+    /** Null = udało się; inaczej powód dla użytkownika. */
+    private suspend fun fetch(ref: TrainRef, key: String): String? {
         val url = "$BASE/api/v1/operations/train/${ref.sid}/${ref.oid}/${ref.serviceDate}"
         val headers = mapOf("X-API-Key" to key, "Accept" to "application/json")
         val started = clock.millis()
@@ -122,10 +143,12 @@ class DelayRepository(
                     (old + (ref to run)).filterValues { Duration.between(it.fetchedAt, now) <= KEEP }
                 }
                 _status.update { it.copy(lastSuccess = now, lastError = null) }
+                return null
             }
-            401, 403 -> _status.update { it.copy(lastError = "klucz API odrzucony (${res.status})") }
-            429 -> _status.update { it.copy(lastError = "limit zapytań API") }
-            else -> _status.update { it.copy(lastError = res.error ?: "HTTP ${res.status}") }
+            0 -> return "brak połączenia z internetem"
+            401, 403 -> return "klucz API odrzucony (${res.status})"
+            429 -> return "limit zapytań API"
+            else -> return "serwer API: HTTP ${res.status}"
         }
     }
 
