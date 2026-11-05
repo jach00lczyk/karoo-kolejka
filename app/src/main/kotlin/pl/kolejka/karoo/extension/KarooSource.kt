@@ -2,6 +2,8 @@ package pl.kolejka.karoo.extension
 
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.DataType
+import io.hammerhead.karooext.models.HttpResponseState
+import io.hammerhead.karooext.models.OnHttpResponse
 import io.hammerhead.karooext.models.OnNavigationState
 import io.hammerhead.karooext.models.OnNavigationState.NavigationState
 import io.hammerhead.karooext.models.LaunchPinDrop
@@ -9,6 +11,10 @@ import io.hammerhead.karooext.models.RideState
 import io.hammerhead.karooext.models.Symbol
 import io.hammerhead.karooext.models.StreamState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.channelFlow
@@ -30,6 +36,9 @@ data class RawStreams(
     val averageSpeed: Double? = null,
 )
 
+/** Wynik żądania HTTP przez Karoo; [status] 0 = brak połączenia (szczegóły w [error]). */
+class HttpResult(val status: Int, val body: ByteArray?, val error: String?)
+
 /**
  * Jedyny punkt dostępu do Karoo (SPEC 2, reguła z CLAUDE.md). Implementacja symulowana
  * przyjdzie w fazie 4.
@@ -44,6 +53,13 @@ interface KarooSource {
 
     /** „Prowadź do stacji" — Karoo otwiera pinezkę z opcją nawigacji (SPEC 4.1). */
     fun navigateTo(station: Station): Boolean
+
+    /**
+     * GET przez „najlepsze połączenie Karoo" (`MakeHttpRequest`, działa też przez mostek
+     * z telefonem; odpowiedź ≤ 100 KB, docs/device-findings.md). Null, gdy Karoo niepołączone,
+     * żądanie odrzucone albo minął [timeoutMs].
+     */
+    suspend fun httpGet(url: String, headers: Map<String, String>, timeoutMs: Long): HttpResult?
 }
 
 class RealKarooSource(private val karoo: KarooSystemService) : KarooSource {
@@ -84,6 +100,22 @@ class RealKarooSource(private val karoo: KarooSystemService) : KarooSource {
             ),
         ),
     ).also { FileLog.i("Prowadź do stacji ${station.name}: dispatched=$it") }
+
+    override suspend fun httpGet(url: String, headers: Map<String, String>, timeoutMs: Long): HttpResult? {
+        if (!karoo.connected) return null
+        val done = withTimeoutOrNull(timeoutMs) {
+            callbackFlow {
+                val id = karoo.addConsumer(
+                    OnHttpResponse.MakeHttpRequest("GET", url, headers = headers, waitForConnection = false),
+                    onError = { close() },
+                ) { event: OnHttpResponse ->
+                    (event.state as? HttpResponseState.Complete)?.let { trySend(it) }
+                }
+                awaitClose { karoo.removeConsumer(id) }
+            }.firstOrNull()
+        } ?: return null
+        return HttpResult(done.statusCode, done.body, done.error)
+    }
 
     private fun NavigationState.toNavInput(): NavInput = when (this) {
         NavigationState.Idle -> NavInput.Idle

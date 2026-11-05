@@ -2,7 +2,7 @@ name: Rozkład (codziennie)
 
 on:
   schedule:
-    - cron: "30 1 * * *" # ≈ 02:30–03:30 w Warszawie
+    - cron: "30 1 * * *" # ≈ 02:30–03:30 w Warszawie; 3 zapytania do API PDP na dobę
   workflow_dispatch:
     inputs:
       force:
@@ -51,12 +51,14 @@ jobs:
 
       - name: Budowa rozkładu
         id: build
+        env:
+          # Klucz API PDP PLK tylko z sekretu repo — nigdy w plikach ani w logach (regulamin 3.3).
+          PDP_API_KEY: ${{ secrets.PDP_API_KEY }}
         run: |
-          args="--out dist --cache cache"
+          args="--out dist"
           [ -f prev-manifest.json ] && args="$args --previous-manifest prev-manifest.json"
           # Push na main (zmiana pipeline'u) zawsze przebudowuje dane.
           if [ "${{ inputs.force }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then args="$args --force"; fi
-          mkdir -p cache
           python pipeline/build_timetable.py $args
 
       - name: Publikacja na gh-pages

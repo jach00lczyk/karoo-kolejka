@@ -6,6 +6,11 @@ import org.junit.Test
 
 class SettingsTest {
     @Test
+    fun `default platform buffer is two minutes`() {
+        assertEquals(2, Settings().bufferMin)
+    }
+
+    @Test
     fun `targets round trip for 1, 3 and 5 groups`() {
         for (t in listOf(
             listOf(setOf(36103)),

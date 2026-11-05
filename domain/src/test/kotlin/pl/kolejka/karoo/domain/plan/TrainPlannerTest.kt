@@ -6,6 +6,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import pl.kolejka.karoo.domain.delay.RunStop
+import pl.kolejka.karoo.domain.delay.TrainRun
 import pl.kolejka.karoo.domain.geo.FinishCandidate
 import pl.kolejka.karoo.domain.geo.LatLon
 import pl.kolejka.karoo.domain.geo.RouteGeometry
@@ -14,6 +16,7 @@ import pl.kolejka.karoo.domain.model.PreferenceMode
 import pl.kolejka.karoo.domain.model.Settings
 import pl.kolejka.karoo.domain.model.Station
 import pl.kolejka.karoo.domain.model.TargetGroups
+import pl.kolejka.karoo.domain.model.TrainRef
 import pl.kolejka.karoo.domain.time.ServiceTime
 import pl.kolejka.karoo.domain.timetable.InMemoryTimetable
 import pl.kolejka.karoo.domain.timetable.InMemoryTimetable.StopData
@@ -69,11 +72,76 @@ class TrainPlannerTest {
         eta: Instant?,
         remainingM: Double = 10_000.0,
         trips: List<TripData> = baseTrips,
-        settings: Settings = Settings(),
+        // Scenariusze liczone przy zapasie 5 min (domyślny do 5.11.2026; teraz 2 min).
+        settings: Settings = Settings(bufferMin = 5),
         geometry: RouteGeometry = geometry(),
         dataStatus: DataStatus? = data,
+        runs: Map<TrainRef, TrainRun> = emptyMap(),
     ): TileState = TrainPlanner(InMemoryTimetable(allStations, trips), clock(now))
-        .plan(geometry, 40_000.0, RideProgress(remainingM, eta), settings, targets, dataStatus)
+        .plan(geometry, 40_000.0, RideProgress(remainingM, eta), settings, targets, dataStatus, runs)
+
+    // Opóźnienia (SPEC 6.8a): kursy 1–3 z numerami zamówień PDP 101–103.
+    private val liveTrips = baseTrips.mapIndexed { i, t -> if (i < 3) t.copy(pdpOid = 101L + i) else t }
+    private fun ref(oid: Long) = TrainRef(2026, oid, day)
+    private fun run(oid: Long, from: Int, dep: Instant?, fetchedAt: Instant, status: String = "P", cancelledFrom: Boolean = false) =
+        ref(oid) to TrainRun(ref(oid), status, listOf(RunStop(from, dep, dep, confirmed = false, cancelled = cancelledFrom)), fetchedAt)
+
+    @Test
+    fun `stations on route use live delays and skip cancelled trains`() {
+        // 18:30, meta 19:30, zostało 30 km (v = 30 km/h): Sulejówek (20 km) ok. 18:50 → T4 19:00;
+        // Halinów (35 km) ok. 19:20 → T5 19:10 planowo nieosiągalny, ale opóźniony o 20 min.
+        val trips = baseTrips.map { it.copy(pdpOid = 100L + it.id) }
+        val now = at(18, 30)
+        val planner = TrainPlanner(InMemoryTimetable(allStations, trips), clock(now))
+        val runs = mapOf(
+            run(104, 20, at(19, 0), now.minusSeconds(60), cancelledFrom = true),
+            run(105, 21, at(19, 30), now.minusSeconds(60)),
+        )
+        val up = UpcomingStations(planner, clock(now)).compute(
+            geometry(), 40_000.0, RideProgress(30_000.0, at(19, 30)), Eta(at(19, 30), false), Settings(bufferMin = 5), targets,
+            limit = 2, runs = runs,
+        )
+        assertEquals(listOf(20, 21), up.map { it.station.id })
+        assertNull(up[0].train)
+        assertEquals(5, up[1].train!!.tripId)
+        assertEquals(20, up[1].train!!.delayMin)
+    }
+
+    @Test
+    fun `delayed earlier train becomes sure main`() {
+        // T1 planowo 17:12 (do złapania), opóźniony 20 min → 17:32 > t_ready 17:26:36
+        val st = plan(now = at(16, 30), eta = at(17, 20), trips = liveTrips, runs = mapOf(run(101, 1, at(17, 32), at(16, 29)))) as TileState.Ok
+        assertEquals(1, st.main.train.tripId)
+        assertEquals(TrainClass.SURE, st.main.cls)
+        assertEquals(20, st.main.train.delayMin)
+        assertEquals(at(17, 12), st.main.train.departure)
+        assertEquals(5 * 60 + 24L, st.main.slack.seconds)
+        assertEquals(listOf(1, 2), st.display.map { it.train.tripId })
+    }
+
+    @Test
+    fun `cancelled main is skipped`() {
+        val st = plan(now = at(16, 30), eta = at(17, 20), trips = liveTrips, runs = mapOf(run(102, 1, at(17, 42), at(16, 29), cancelledFrom = true))) as TileState.Ok
+        assertEquals(3, st.main.train.tripId)
+        val cancelled = st.options.single { it.train.tripId == 2 }
+        assertTrue(cancelled.train.cancelled)
+        assertEquals(TrainClass.MISSED, cancelled.cls)
+        assertNull(cancelled.vReqKmh)
+    }
+
+    @Test
+    fun `stale live data is ignored`() {
+        val st = plan(now = at(16, 30), eta = at(17, 20), trips = liveTrips, runs = mapOf(run(101, 1, at(17, 32), at(15, 50)))) as TileState.Ok
+        assertEquals(2, st.main.train.tripId)
+        assertNull(st.options.first().train.live)
+    }
+
+    @Test
+    fun `train planned before window but delayed into it is found`() {
+        // now 17:40, meta 18:00 → t_ready 18:06:36, okno od 17:36:36; T1 planowo 17:12, prognoza 17:50
+        val st = plan(now = at(17, 40), eta = at(18, 0), trips = liveTrips, runs = mapOf(run(101, 1, at(17, 50), at(17, 39)))) as TileState.Ok
+        assertTrue(st.options.any { it.train.tripId == 1 && it.train.delayMin == 38 })
+    }
 
     @Test
     fun `classifies catchable, sure main and next with last flag`() {

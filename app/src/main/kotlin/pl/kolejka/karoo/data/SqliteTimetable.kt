@@ -6,6 +6,7 @@ import pl.kolejka.karoo.domain.geo.LatLon
 import pl.kolejka.karoo.domain.model.Connection
 import pl.kolejka.karoo.domain.model.Station
 import pl.kolejka.karoo.domain.model.TargetGroups
+import pl.kolejka.karoo.domain.model.TrainRef
 import pl.kolejka.karoo.domain.plan.DataStatus
 import pl.kolejka.karoo.domain.timetable.Timetable
 import java.io.File
@@ -54,12 +55,20 @@ class SqliteTimetable private constructor(private val db: SQLiteDatabase) : Time
     val defaultTargets: TargetGroups =
         TargetGroups(Json.decodeFromString<List<List<Int>>>(meta.getValue("default_targets")).map { it.toSet() })
 
+    /** Rozkład z API PDP ma ID zamówień (opóźnienia, SPEC 6.8a); starszy z GTFS — nie. */
+    val hasPdpRefs: Boolean = db.rawQuery("PRAGMA table_info(trip_date)", null).use { c ->
+        var found = false
+        while (c.moveToNext()) if (c.getString(1) == "pdp_oid") found = true
+        found
+    }
+
     override fun connections(from: Set<Int>, targets: Set<Int>, serviceDate: LocalDate, depRange: IntRange): List<Connection> {
         if (from.isEmpty() || targets.isEmpty()) return emptyList()
         // ID są liczbami z naszej bazy — bezpieczne do wklejenia w IN (…).
         val sql = """
             SELECT a.trip_id, a.station_id, a.dep_s, b.station_id, b.arr_s, a.platform, a.track,
-                   t.agency, t.route_short_name, t.headsign, t.is_bus
+                   t.agency, t.route_short_name, t.headsign, t.is_bus,
+                   ${if (hasPdpRefs) "d.pdp_sid, d.pdp_oid, (a.flags & 4)" else "NULL, NULL, 0"}
             FROM stop_time a
             JOIN trip_date d ON d.trip_id = a.trip_id AND d.service_date = ?
             JOIN stop_time b ON b.trip_id = a.trip_id AND b.seq > a.seq
@@ -82,7 +91,9 @@ class SqliteTimetable private constructor(private val db: SQLiteDatabase) : Time
                             toStationId = c.getInt(3), arrS = c.getInt(4),
                             platform = c.getStringOrNull(5), track = c.getStringOrNull(6),
                             agency = c.getString(7), routeShortName = c.getStringOrNull(8),
-                            headsign = c.getStringOrNull(9), isBus = c.getInt(10) != 0,
+                            // flags & 4: odjazd z tej stacji autobusem ZKA (kurs częściowo zastępczy).
+                            headsign = c.getStringOrNull(9), isBus = c.getInt(10) != 0 || c.getInt(13) != 0,
+                            ref = if (c.isNull(11) || c.isNull(12)) null else TrainRef(c.getInt(11), c.getLong(12), serviceDate),
                         ),
                     )
                 }

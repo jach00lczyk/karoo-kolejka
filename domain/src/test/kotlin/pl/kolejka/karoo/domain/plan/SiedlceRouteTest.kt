@@ -76,27 +76,29 @@ class SiedlceRouteTest {
         assertTrue(up.all { it.train != null && !it.train!!.departure.isBefore(it.eta) })
 
         val lines = TileText.lines(TileModel(st, up, stationName = { if (it == 33571) "Warszawa Śródmieście" else "?" }), compact = false)
-        assertTrue(lines.first().text, lines.first().text.startsWith("Siedlce → W-wa Śródm.  P2"))
+        assertTrue(lines.first().text, lines.first().text.startsWith("Siedlce → W-wa Śródm.  [P2]"))
         assertTrue(lines.any { it.text.startsWith("${TileText.SURE} 15:30→16:57") })
         assertTrue(lines.any { it.text.startsWith("Mrozy ~") })
 
-        // Wysoki kafel: meta i stacje po drodze ze „skąd → dokąd" i 🚲, kółka klas pociągów.
+        // Wysoki kafel: meta i stacje po drodze ze „skąd → dokąd" i ETA, kółka klas pociągów.
         val model = TileModel(st, up, { if (it == 33571) "Warszawa Śródmieście" else "?" }, Eta(at(14, 50), false), routeM - 5_000)
         val tall = TileText.lines(model, pl.kolejka.karoo.domain.text.TileLayout.TALL)
         assertEquals("Siedlce → W-wa Śródm.", tall[0].text)
-        assertEquals("${TileText.BIKE} 14:50 · 37 km", tall[1].text)
+        assertEquals("${TileText.ETA} 14:50 · 37 km", tall[1].text)
         assertEquals("${TileText.CATCHABLE} 14:30 → 15:57", tall[2].text)
-        assertTrue(tall[3].text, tall[3].text.startsWith("P2 · potrzeba "))
+        assertTrue(tall[3].text, tall[3].text.startsWith("[P2] potrzeba "))
         val mainIdx = tall.indexOfFirst { it.text == "${TileText.SURE} 15:30 → 16:57" }
         assertTrue(tall.joinToString("\n") { it.text }, mainIdx > 0)
         assertTrue(tall[mainIdx + 1].small)
-        assertTrue(tall[mainIdx + 1].text, tall[mainIdx + 1].text.startsWith("P2 · zapas "))
+        assertTrue(tall[mainIdx + 1].text, tall[mainIdx + 1].text.startsWith("[P2] zapas "))
         assertEquals("${TileText.NEXT} 16:30 → 17:57", tall[mainIdx + 2].text)
         val mrozy = tall.indexOfFirst { it.text == "Mrozy → W-wa Śródm." }
         assertTrue(tall.joinToString("\n") { it.text }, mrozy > 0)
         assertTrue(tall.subList(mrozy, mrozy + 3).all { it.small })
-        assertTrue(tall[mrozy + 1].text, Regex("${TileText.BIKE} \\d\\d:\\d\\d · \\d+(,\\d)? km").matches(tall[mrozy + 1].text))
-        assertTrue(tall[mrozy + 2].text, Regex("\\d\\d:56 → \\d\\d:57 · P1").matches(tall[mrozy + 2].text))
+        // Stacje po drodze pod kreską
+        assertTrue(tall.take(mrozy).any { it.divider })
+        assertTrue(tall[mrozy + 1].text, Regex("${TileText.ETA} \\d\\d:\\d\\d · \\d+(,\\d)? km").matches(tall[mrozy + 1].text))
+        assertTrue(tall[mrozy + 2].text, Regex("\\d\\d:56 → \\d\\d:57 \\[P1]").matches(tall[mrozy + 2].text))
         // Ostatni pociąg dnia w oknie ma czerwony dopisek zamiast tekstu w linii
         assertTrue(tall.none { "OSTATNI" in it.text })
     }

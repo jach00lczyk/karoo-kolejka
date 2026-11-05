@@ -2,6 +2,67 @@
 
 ## [Unreleased]
 
+### Kafelek po próbach na Karoo, odwrócona trasa (2026-11-05, gałąź `pdp-api`)
+
+- **Błąd: odwrócona trasa liczyła metę na złym końcu.** Karoo przy `reversed=true` podaje tę samą
+  polyline co bez odwrócenia (log 25.10: te same pierwszy/ostatni punkt, dystans do celu 8 → 39 km);
+  wniosek z fazy 0 był błędny. Punkty odwracamy sami (`NavInput.Route.ridePoints`). Objaw: trasa
+  Sochaczew ↔ Imielin odwrócona nie pokazywała pociągów z Sochaczewa.
+- **Błąd: Glance rysuje w jednej kolumnie najwyżej 10 linii** i resztę pomija bez ostrzeżenia —
+  ucinało stacje po drodze. Linie w zagnieżdżonych kolumnach; przy braku miejsca odcinamy całe
+  bloki (stacja + ETA + pociąg), nie pojedyncze linie.
+- Wygląd (uzgodniony na urządzeniu): znaki ● żółty / ● zielony / ○ niebieski / ✕ czerwony zamiast
+  emoji, opóźnienie „+N" na czerwono, jeden rozmiar czcionki dla wszystkich linii z godzinami,
+  „ETA" zamiast 🚲, peron w nawiasie „[P2/t4]", kreska między metą a stacjami po drodze,
+  czytelny układ „Nie zdążysz → Zjedź: …". W pierwszym wierszu po prawej „⏱ N'" (wiek opóźnień;
+  na czerwonym kafelku białe).
+- Nazwy „skąd → dokąd" skracane tylko, gdy się nie mieszczą: najpierw Warszawa („W-wa Gdańska" →
+  „W-wa Gd."), potem stacja startowa. Szerokość tekstu szacowana osobno dla liter, cyfr i spacji.
+- Aplikacja: zakładka „Meta" → „Finisz"; przycisk „Sprawdź opóźnienia" widoczny zawsze, a brak
+  klucza API widać od razu. Dotknięcie fragmentu kafelka Karoo nie przekazuje (sprawdzone), więc
+  ręczne odświeżanie tylko z aplikacji.
+- Opóźnienia także dla pociągów ze stacji po drodze (kafel i zakładka „Po drodze"); limit 40/h,
+  przycisk w aplikacji sprawdza do 6 pociągów, także tych ze stacji po drodze.
+- Domyślny zapas na peronie 2 min (było 5); zapisane ustawienia się nie zmieniają.
+- Tryb demo kafelka (tylko debug): 8 zmyślonych scenariuszy, przełączanie z adb lub w Opcjach.
+- Log kafla zawiera dystans i kilometr stacji po drodze (zgłoszony podejrzany dystans do Żyrardowa).
+
+### Opóźnienia na żywo (2026-11-03, gałąź `pdp-api`, wersja 0.3.0)
+
+- Kafelek i zakładka Meta pokazują opóźnienie przy planowym odjeździe („17:42 +6") i
+  „ODWOŁANY". „Zdążę?" liczy się od oczekiwanego odjazdu (nigdy wcześniejszego niż planowy);
+  odwołany kurs odpada i histereza go nie trzyma. Dane starsze niż 30 min są ignorowane.
+- Źródło: `/api/v1/operations/train/{sid}/{oid}/{data}` (czasy potwierdzone lub prognoza PLK
+  na każdej stacji, 3–6 KB), przez `MakeHttpRequest` Karoo, awaryjnie bezpośrednio.
+- Bez nowego timera (SPEC 7.3): sprawdza minutowy tik kafla — pociągi z kafelka z odjazdem
+  w ciągu 90 min, co 10 min; przy niewidocznym kafelku i zamkniętej aplikacji zero zapytań.
+  Limit 30 zapytań/h. Przycisk „Sprawdź opóźnienia" (Meta): do 4 pociągów, raz na minutę.
+- Klucz API wgrywany przez `adb push` (README), przenoszony do pamięci prywatnej; nigdy w APK
+  ani w logach. Ze starym rozkładem (GTFS, bez ID zamówień) opóźnienia po prostu się nie pokazują.
+- Kurs częściowo zastępczy: 🚌 przy odjeździe ze stacji obsługiwanej autobusem (`flags & 4`).
+- Domena: `TrainRun` (parser odpowiedzi), `DelayPolicy` (kiedy pytać, limit), opóźnienia
+  w `TrainPlanner`/`TileStabilizer`/`TileText`; +17 testów. Bez nowych zależności.
+- **Nie sprawdzone na Karoo** — do zmierzenia w docs/device-findings.md (nagłówek przez
+  `MakeHttpRequest`, mostek BT).
+
+### Rozkład z API PDP PKP PLK (2026-11-03, gałąź `pdp-api`)
+
+- Pipeline pobiera rozkład z API Otwarte Dane Kolejowe PKP PLK zamiast z GTFS mkuran.pl:
+  jedno zapytanie na całe okno 16 dni (`/schedules/shortened`, KM + SKM + ŁKA + WKD) i jedno
+  o wersję danych (bez zmian → bez publikacji). Klucz tylko w sekrecie `PDP_API_KEY`.
+- Na danych z 3.11: te same odjazdy, linie i perony co z GTFS (sprawdzone Mińsk, Otwock,
+  Legionowo, Skierniewice, WKD z Podkowy). Perony KM/SKM/ŁKA 100%, WKD 4%. Plik 1,20 MB
+  (było 2,01 MB): identyczne zamówienia (WKD ma osobne na każdy dzień) scalone w jeden kurs.
+- Schemat zgodny wstecz (`schema_version` 1, dopisane kolumny): `trip_date.pdp_sid/pdp_oid`
+  (do opóźnień), `trip.train_no`, bit `stop_time.flags & 4` = odjazd autobusem ZKA (peron „BUS";
+  KM oznacza tak częściową komunikację zastępczą, np. „R61/Z61" → linia „R61").
+- Czasy przeliczane na „południe − 12 h" (SPEC 6.7) także w dni zmiany czasu; w nocy cofania
+  zegara odjazd przed 01:00 ma ujemną liczbę sekund — `ServiceTime.windows` już tego nie obcina.
+- **ID stacji WKD zmieniają się** na ID PLK (np. Śródmieście WKD 14357927 → 35006). Domyślne
+  cele przeliczą się same; ręcznie dodane stacje WKD w Opcjach trzeba dodać ponownie.
+- Grupowanie bliźniaków: promień 700 m (Śródmieście ↔ Śródmieście WKD to wg PLK 628 m).
+- Domyślne cele: dopisane Warszawa Zachodnia i Warszawa Centralna (po Śródmieściu).
+
 ### Rozkład: dodana ŁKA (2026-10-26)
 
 - Pipeline: przewoźnik Łódzka Kolej Aglomeracyjna (`LKA`; linie Ł, ŁP, **ŁS Sprinter**, ZKA)

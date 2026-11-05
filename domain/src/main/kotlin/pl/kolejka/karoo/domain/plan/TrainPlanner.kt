@@ -1,5 +1,6 @@
 package pl.kolejka.karoo.domain.plan
 
+import pl.kolejka.karoo.domain.delay.TrainRun
 import pl.kolejka.karoo.domain.geo.FinishCandidate
 import pl.kolejka.karoo.domain.geo.RouteGeometry
 import pl.kolejka.karoo.domain.model.Connection
@@ -8,6 +9,7 @@ import pl.kolejka.karoo.domain.model.Settings
 import pl.kolejka.karoo.domain.model.Station
 import pl.kolejka.karoo.domain.model.TargetGroups
 import pl.kolejka.karoo.domain.model.Train
+import pl.kolejka.karoo.domain.model.TrainRef
 import pl.kolejka.karoo.domain.time.ServiceTime
 import pl.kolejka.karoo.domain.timetable.Timetable
 import java.time.Clock
@@ -32,6 +34,7 @@ data class DataStatus(val validTo: LocalDate, val generatedAt: Instant)
 /**
  * Wybór stacji i pociągów na mecie (SPEC 6.3–6.5). Bezstanowy — histerezę nakłada
  * [TileStabilizer]. Wywoływać na Dispatchers.Default (zapytania do bazy są krótkie).
+ * Opóźnienia ([TrainRun], SPEC 6.8a) przesuwają oczekiwany odjazd i wykluczają kursy odwołane.
  */
 class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
 
@@ -42,6 +45,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
         settings: Settings,
         targets: TargetGroups,
         data: DataStatus?,
+        runs: Map<TrainRef, TrainRun> = emptyMap(),
     ): TileState {
         val now = clock.instant()
         if (data == null) return TileState.DataMissing
@@ -62,7 +66,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
             progress.movingAvgSpeedMps, settings.fallbackSpeedKmh,
         )
         val remaining = progress.remainingM?.takeIf { it.isFinite() && it >= 0 } ?: routeDistanceM
-        val ctx = Ctx(now, eta, remaining, settings, targets)
+        val ctx = Ctx(now, eta, remaining, settings, targets, runs)
 
         val perCandidate = candidates.map { c -> c to evaluate(c, ctx, WINDOW_AFTER) }
         val withSure = perCandidate.filter { (_, opts) -> opts.any { it.cls == TrainClass.SURE } }
@@ -75,7 +79,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
         val (cand, options, mainIdx) = chosen
         // OSTATNI: najpóźniejszy pociąg okna, jeśli po nim nic już tego dnia nie jedzie.
         val withLast = options.toMutableList()
-        if (isLastOfDay(cand.station, options.last().train, targets)) {
+        if (isLastOfDay(cand.station, options.last().train, ctx)) {
             withLast[withLast.lastIndex] = options.last().copy(isLast = true)
         }
         val main = withLast[mainIdx]
@@ -106,6 +110,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
         settings: Settings,
         targets: TargetGroups,
         count: Int = 8,
+        runs: Map<TrainRef, TrainRun> = emptyMap(),
     ): FinishBoard {
         val now = clock.instant()
         val eta = EtaEstimator.finishEta(
@@ -113,9 +118,9 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
             progress.movingAvgSpeedMps, settings.fallbackSpeedKmh,
         )
         val remaining = progress.remainingM?.takeIf { it.isFinite() && it >= 0 } ?: routeDistanceM
-        val ctx = Ctx(now, eta, remaining, settings, targets)
+        val ctx = Ctx(now, eta, remaining, settings, targets, runs)
         val ready = tReady(candidate, ctx)
-        val trains = trainsFrom(candidate.station.id, ready.minus(WINDOW_BEFORE), serviceDayEnd(ready), targets)
+        val trains = trainsFrom(candidate.station.id, ready.minus(WINDOW_BEFORE), serviceDayEnd(ready), targets, runs, now)
         val options = trains.take(count).map { classify(it, ready, remaining + candidate.distanceM, ctx) }.toMutableList()
         if (options.isNotEmpty() && trains.size <= count) {
             options[options.lastIndex] = options.last().copy(isLast = true)
@@ -126,7 +131,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
     /** Pociągi z okna dla jednego kandydata, sklasyfikowane względem t_ready. */
     private fun evaluate(c: FinishCandidate, ctx: Ctx, windowEnd: Duration): List<TrainOption> {
         val tReady = tReady(c, ctx)
-        return trainsFrom(c.station.id, tReady.minus(WINDOW_BEFORE), tReady.plus(windowEnd), ctx.targets)
+        return trainsFrom(c.station.id, tReady.minus(WINDOW_BEFORE), tReady.plus(windowEnd), ctx.targets, ctx.runs, ctx.now)
             .map { classify(it, tReady, ctx.remainingM + c.distanceM, ctx) }
     }
 
@@ -136,10 +141,11 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
             .plus(Duration.ofMinutes(ctx.settings.bufferMin.toLong()))
 
     private fun classify(t: Train, tReady: Instant, distanceM: Double, ctx: Ctx): TrainOption {
-        val slack = Duration.between(tReady, t.departure)
-        val available = Duration.between(ctx.now, t.departure).minusMinutes(ctx.settings.bufferMin.toLong()).seconds
-        val vReq = if (available > 0) distanceM / available * 3.6 else null
+        val slack = Duration.between(tReady, t.expectedDeparture)
+        val available = Duration.between(ctx.now, t.expectedDeparture).minusMinutes(ctx.settings.bufferMin.toLong()).seconds
+        val vReq = if (available > 0 && !t.cancelled) distanceM / available * 3.6 else null
         val cls = when {
+            t.cancelled -> TrainClass.MISSED
             !slack.isNegative -> TrainClass.SURE
             vReq != null && vReq <= ctx.settings.vMaxKmh -> TrainClass.CATCHABLE
             else -> TrainClass.MISSED
@@ -183,7 +189,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
         val best = candidates.first()
         val tReady = tReady(best, ctx)
         val dayStart = serviceDayStart(tReady)
-        val earlier = trainsFrom(best.station.id, dayStart, tReady, ctx.targets)
+        val earlier = trainsFrom(best.station.id, dayStart, tReady, ctx.targets, ctx.runs, ctx.now).filter { !it.cancelled }
         if (earlier.isEmpty()) return TileState.NoTrainsToday(best.station)
         val last = classify(earlier.last(), tReady, ctx.remainingM + best.distanceM, ctx).copy(isLast = true)
         return TileState.LastTrainMissed(
@@ -213,28 +219,48 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
                 val ready = etaStation
                     .plusSeconds((s.distanceFromRouteM / (ctx.settings.accessSpeedKmh / 3.6)).toLong())
                     .plus(Duration.ofMinutes(ctx.settings.bufferMin.toLong()))
-                trainsFrom(s.station.id, ready, serviceDayEnd(ready), ctx.targets).firstOrNull()
+                trainsFrom(s.station.id, ready, serviceDayEnd(ready), ctx.targets, ctx.runs, ctx.now).firstOrNull { !it.cancelled }
                     ?.let { Alternative(s.station, pos, etaStation, it) }
             }
     }
 
-    private fun isLastOfDay(station: Station, train: Train, targets: TargetGroups): Boolean =
-        trainsFrom(station.id, train.departure.plusSeconds(1), serviceDayEnd(train.departure), targets).isEmpty()
+    private fun isLastOfDay(station: Station, train: Train, ctx: Ctx): Boolean =
+        trainsFrom(station.id, train.expectedDeparture.plusSeconds(1), serviceDayEnd(train.departure), ctx.targets, ctx.runs, ctx.now)
+            .none { !it.cancelled }
 
     private fun untilEndOfDay(c: FinishCandidate, ctx: Ctx): Duration =
         Duration.between(tReady(c, ctx), serviceDayEnd(tReady(c, ctx))).coerceAtLeast(WINDOW_AFTER)
 
-    /** Pociągi z danej stacji odjeżdżające w [from, to], z etykietą celu. */
-    fun trainsFrom(stationId: Int, from: Instant, to: Instant, targets: TargetGroups): List<Train> {
+    /**
+     * Pociągi z danej stacji z oczekiwanym odjazdem w [from, to], z etykietą celu. Z [runs]
+     * (świeższymi niż [MAX_RUN_AGE] względem [now]) dokłada czasy na żywo; opóźniony pociąg
+     * z planowym odjazdem do [LIVE_LOOKBACK] przed [from] też się łapie.
+     */
+    fun trainsFrom(
+        stationId: Int,
+        from: Instant,
+        to: Instant,
+        targets: TargetGroups,
+        runs: Map<TrainRef, TrainRun> = emptyMap(),
+        now: Instant = clock.instant(),
+    ): List<Train> {
         if (to.isBefore(from)) return emptyList()
-        val rows = ServiceTime.windows(from, to).flatMap { (date, range) ->
+        val queryFrom = if (runs.isEmpty()) from else from.minus(LIVE_LOOKBACK)
+        val rows = ServiceTime.windows(queryFrom, to).flatMap { (date, range) ->
             timetable.connections(setOf(stationId), targets.allIds, date, range)
         }
         return rows.groupBy { Triple(it.tripId, it.serviceDate, it.fromStationId) }
             .values
             .mapNotNull { toTrain(it, targets) }
-            .filter { !it.departure.isBefore(from) && !it.departure.isAfter(to) }
-            .sortedWith(compareBy({ it.departure }, { it.earliestArrival }))
+            .map { t -> withLive(t, runs, now) }
+            .filter { !it.expectedDeparture.isBefore(from) && !it.departure.isAfter(to) }
+            .sortedWith(compareBy({ it.expectedDeparture }, { it.earliestArrival }))
+    }
+
+    private fun withLive(t: Train, runs: Map<TrainRef, TrainRun>, now: Instant): Train {
+        val run = t.ref?.let { runs[it] } ?: return t
+        if (Duration.between(run.fetchedAt, now) > MAX_RUN_AGE) return t
+        return t.copy(live = run.liveFor(t))
     }
 
     private fun toTrain(rows: List<Connection>, targets: TargetGroups): Train? {
@@ -262,15 +288,27 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
             labelStationId = label.value.toStationId,
             labelArrival = ServiceTime.toInstant(first.serviceDate, label.value.arrS),
             earliestArrival = ServiceTime.toInstant(first.serviceDate, earliest.arrS),
+            ref = first.ref,
         )
     }
 
-    data class Ctx(val now: Instant, val eta: Eta, val remainingM: Double, val settings: Settings, val targets: TargetGroups)
+    data class Ctx(
+        val now: Instant,
+        val eta: Eta,
+        val remainingM: Double,
+        val settings: Settings,
+        val targets: TargetGroups,
+        val runs: Map<TrainRef, TrainRun> = emptyMap(),
+    )
 
     companion object {
         val WINDOW_BEFORE: Duration = Duration.ofMinutes(30)
         val WINDOW_AFTER: Duration = Duration.ofHours(3)
         val SAFE_PLAN_SLACK: Duration = Duration.ofMinutes(10)
+
+        /** Starsze dane o opóźnieniu ignorujemy — wraca rozkład planowy (SPEC 7.3). */
+        val MAX_RUN_AGE: Duration = Duration.ofMinutes(30)
+        val LIVE_LOOKBACK: Duration = Duration.ofHours(1)
 
         /** Koniec „dnia" dla ostatniego pociągu: najbliższa 03:00 lokalnego czasu po [t]. */
         fun serviceDayEnd(t: Instant): Instant {

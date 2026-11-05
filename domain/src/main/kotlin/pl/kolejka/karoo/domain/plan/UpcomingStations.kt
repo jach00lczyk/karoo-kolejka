@@ -1,10 +1,12 @@
 package pl.kolejka.karoo.domain.plan
 
+import pl.kolejka.karoo.domain.delay.TrainRun
 import pl.kolejka.karoo.domain.geo.RouteGeometry
 import pl.kolejka.karoo.domain.model.Settings
 import pl.kolejka.karoo.domain.model.Station
 import pl.kolejka.karoo.domain.model.TargetGroups
 import pl.kolejka.karoo.domain.model.Train
+import pl.kolejka.karoo.domain.model.TrainRef
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -34,6 +36,7 @@ class UpcomingStations(private val planner: TrainPlanner, private val clock: Clo
      * @param limit ile nieminiętych stacji (od najbliższej)
      * @param trainsPerStation ile pociągów na stację (kafel: 1, zakładka „Po drodze": 4)
      * @param includePassed czy dołączyć minięte stacje (na końcu listy, SPEC 8.2)
+     * @param runs opóźnienia z API (SPEC 6.8a): przesuwają odjazdy, odwołane kursy pomijamy
      */
     fun compute(
         geometry: RouteGeometry,
@@ -45,6 +48,7 @@ class UpcomingStations(private val planner: TrainPlanner, private val clock: Clo
         limit: Int,
         trainsPerStation: Int = 1,
         includePassed: Boolean = false,
+        runs: Map<TrainRef, TrainRun> = emptyMap(),
     ): List<UpcomingStation> {
         val now = clock.instant()
         val remaining = progress.remainingM?.takeIf { it.isFinite() && it >= 0 } ?: routeDistanceM
@@ -65,7 +69,9 @@ class UpcomingStations(private val planner: TrainPlanner, private val clock: Clo
                 val ready = eta
                     .plusSeconds((s.distanceFromRouteM / (settings.accessSpeedKmh / 3.6)).toLong())
                     .plus(Duration.ofMinutes(settings.bufferMin.toLong()))
-                val trains = planner.trainsFrom(s.station.id, ready, TrainPlanner.serviceDayEnd(ready), targets).take(trainsPerStation)
+                val trains = planner.trainsFrom(s.station.id, ready, TrainPlanner.serviceDayEnd(ready), targets, runs, now)
+                    .filter { !it.cancelled }
+                    .take(trainsPerStation)
                 UpcomingStation(s.station, pos, s.distanceFromRouteM, distance, eta, trains)
             }
         if (!includePassed) return ahead

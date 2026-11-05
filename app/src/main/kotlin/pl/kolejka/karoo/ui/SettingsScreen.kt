@@ -29,10 +29,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 import pl.kolejka.karoo.AppContainer
+import pl.kolejka.karoo.BuildConfig
 import pl.kolejka.karoo.R
 import pl.kolejka.karoo.domain.model.PreferenceMode
 import pl.kolejka.karoo.domain.model.Settings
 import pl.kolejka.karoo.domain.model.Station
+import pl.kolejka.karoo.extension.DemoScenarios
 import pl.kolejka.karoo.log.FileLog
 import kotlin.math.roundToInt
 
@@ -95,6 +97,7 @@ fun SettingsScreen(data: AppData, onAddTarget: () -> Unit) {
         }
         item { SwitchRow(stringResource(R.string.settings_tile_clickable), settings.tileClickable) { v -> update { it.copy(tileClickable = v) } } }
         item { SwitchRow(stringResource(R.string.settings_notifications), settings.notifications) { v -> update { it.copy(notifications = v) } } }
+        if (BuildConfig.DEBUG) item { DemoControls() }
 
         aboutItems(data)
     }
@@ -151,5 +154,23 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, fontSize = 15.sp, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** Tryb demo kafelka (tylko debug): zmyślone stany do sprawdzenia wyglądu bez jazdy. */
+@Composable
+private fun DemoControls() {
+    val demo by DemoScenarios.current.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).padding(8.dp)) {
+        Text(stringResource(R.string.demo_title), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(
+            demo?.let { "$it/${DemoScenarios.count}: ${DemoScenarios.names[it - 1]}" } ?: stringResource(R.string.demo_off),
+            fontSize = 14.sp, color = DIM,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SecondaryButton("◀", Modifier.weight(1f)) { DemoScenarios.previous() }
+            SecondaryButton("▶", Modifier.weight(1f)) { DemoScenarios.next() }
+            SecondaryButton("✕", Modifier.weight(1f), enabled = demo != null) { DemoScenarios.set(null) }
+        }
     }
 }

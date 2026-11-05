@@ -23,11 +23,11 @@ Rozszerzenie karoo-ext, które:
 
 ### 1.1 Dane: preprocessing w chmurze, nie na Karoo
 
-Źródła (Mikołaj Kuranowski, mkuran.pl):
-- `https://mkuran.pl/gtfs/polish_trains.zip` — zawiera m.in. **Koleje Mazowieckie i SKM Warszawa**; aktualizowany codziennie. (Osobny feed KM został wycofany na rzecz tego pliku.)
-- `https://mkuran.pl/gtfs/wkd.zip` — **WKD**, licencja CC0.
+Źródło (od 3.11.2026): **API Otwarte Dane Kolejowe PKP PLK** (`https://pdp-api.plk-sa.pl`, klucz w nagłówku `X-API-Key`, pakiet Basic: 100 zapytań/h, 1000/dobę). `/api/v1/schedules/shortened` z `carriersInclude=KM,SKM,ŁKA,WKD&fullRoute=true` zwraca całe okno 16 dni w jednym zapytaniu (~4 MB gzip, ~23 MB JSON) razem ze słownikiem stacji (ID PLK, współrzędne). Peron/tor przy 100% postojów KM, SKM i ŁKA; ZKA oznaczona peronem „BUS". Do 3.11.2026 źródłem był GTFS mkuran.pl (`polish_trains.zip` + `wkd.zip`).
 
-`polish_trains.zip` ma **~29,5 MB spakowany / ~111 MB rozpakowany** (cała Polska). Pobieranie i parsowanie tego na Karoo = duży transfer (bez Wi-Fi Karoo idzie przez mostek Bluetooth z telefonem, który ma bardzo niską przepustowość), duże zużycie CPU/RAM/baterii, ryzyko OOM.
+Klucz API: regulamin zabrania udostępniania go osobom trzecim, a repo i APK są publiczne → klucz **tylko** w sekrecie repo `PDP_API_KEY` (workflow) i w Keychain na komputerze właściciela; nigdy w plikach, logach ani w URL.
+
+Surowe dane to kilkadziesiąt MB JSON-u. Pobieranie i parsowanie tego na Karoo = duży transfer (bez Wi-Fi Karoo idzie przez mostek Bluetooth z telefonem, który ma bardzo niską przepustowość), duże zużycie CPU/RAM/baterii, ryzyko OOM.
 
 **Decyzja:** codzienny job w GitHub Actions filtruje dane i publikuje:
 - `manifest.json` (~300 B) — wersja, sha256, rozmiar, zakres dat,
@@ -97,7 +97,9 @@ Kotlin, coroutines + Flow, Jetpack Compose (aplikacja), Glance/RemoteViews (kafe
 ## 3. Pipeline danych (`pipeline/build_timetable.py`)
 
 ### 3.1 Wejście
-- `polish_trains.zip` i `wkd.zip` (warunkowe pobranie `If-Modified-Since`/ETag; oba niezmienione → koniec bez publikacji).
+- `/api/v1/data-version` → `schedulesVersion`; ta sama wersja co w poprzednim manifeście i dane ważne jeszcze ≥ 12 dni → koniec bez publikacji (1 zapytanie).
+- W przeciwnym razie `/api/v1/schedules/shortened` na okno dat (sekcja 3.3). Razem ≤ 2 zapytania na przebieg, 4xx bez ponowień.
+- Szczegóły mapowania (scalanie identycznych zamówień, `trip_date.pdp_sid/pdp_oid`, flaga ZKA, czasy w dni zmiany czasu) — docstring `build_timetable.py`.
 
 ### 3.2 Filtrowanie i scalanie
 1. `agency.txt` z `polish_trains` → agencje **KM** i **SKM Warszawa** znalezione po nazwie (zaloguj ID; brak którejś → błąd, bez publikacji). Z `wkd.zip` → wszystko. Prefiksuj ID źródłem (`pt:`, `wkd:`), żeby nie było kolizji.
@@ -274,7 +276,7 @@ Po pierwszym `Ready` dla nowego `routeKey` (raz na trasę, dedup po `routeKey`):
 
 1. **Meta** = ostatni punkt w kierunku jazdy (`reversed` wg fazy 0); dla `NavigatingToDestination` = współrzędne celu.
 2. **Kandydaci** = stacje ≤ `R_meta` (domyślnie 1000 m). Siatka przestrzenna (~0,02°) + haversine.
-3. Dla kandydata: `t_ready = ETA_meta + dist(meta, stacja) / v_dojazd + zapas` (`v_dojazd` = 15 km/h, `zapas` = 5 min; ustawialne).
+3. Dla kandydata: `t_ready = ETA_meta + dist(meta, stacja) / v_dojazd + zapas` (`v_dojazd` = 15 km/h, `zapas` = 2 min — do 5.11.2026 było 5; ustawialne).
 4. Zapytanie: odjazdy ze stacji w oknie `[t_ready − 30 min, t_ready + 3 h]`, których kurs później zatrzymuje się w którejś grupie celów; dla każdego: odjazd, przyjazd, etykieta celu, linia, `is_bus`, peron/tor.
 5. **Główny pociąg** = pierwszy z odjazdem ≥ `t_ready`. Wybór kandydata: najwcześniejszy przyjazd do celu; remis → bliższa stacja.
 6. Tryb preferencji (ustawienie): **Najszybciej** (domyślny) lub **Ścisła preferencja** (najwyższa grupa, chyba że jej pociąg jest > X min, domyślnie 30, później niż najszybsza opcja).
@@ -323,6 +325,11 @@ Wynik to lista: najbliższy **DO ZŁAPANIA** (jeśli jest) + główny **PEWNY** 
 
 ### 6.8 Polyline
 Własny dekoder Google Encoded Polyline z parametrem precyzji (+ testy). Uproszczenie Douglas-Peucker (20 m) przed obliczeniami geo.
+
+### 6.8a Opóźnienia
+- Kurs w bazie ma `trip_date.pdp_sid/pdp_oid`; API zwraca dla każdej stacji `actualArrival/actualDeparture` (potwierdzone `isConfirmed` albo prognoza) i `isCancelled`.
+- Oczekiwany odjazd = max(planowy, z API) — pociąg nie odjeżdża przed czasem. Klasyfikacja „zdążę?" (6.4) liczona od oczekiwanego odjazdu; kurs odwołany na stacji odjazdu lub celu → ODPADA i nigdy nie jest głównym (histereza go nie trzyma).
+- Wyświetlanie: planowy odjazd + „+N" (N ≥ 1 min), „ODWOŁANY" zamiast zapasu.
 
 ### 6.9 Stany wyniku (każdy ma widok kafelka)
 `NoRoute`, `Computing`, `NoStationNearFinish(odległośćDoNajbliższej, stacjePoDrodze)`, `NoTrainsToday`, `LastTrainMissed(...)`, `AlreadyAtTarget`, `DataMissing`, `DataStale(wiek)`, `Ok(trains, flags)`.
@@ -381,6 +388,18 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 - `etaMinute` = ETA obcięte do pełnej minuty + `distinctUntilChanged`.
 - Tik raz na minutę (przeliczenie zapasu/`v_req`) tylko gdy widok aktywny.
 - Strumień prędkości subskrybowany tylko przy wariancie szerokim.
+- **Opóźnienia na żywo (od 3.11.2026)** — jedyny polling, i to bez własnego timera: przy każdym
+  przeliczeniu z minutowego tiku `DelayPolicy` sprawdza, czy pociągi pokazane na kafelku
+  (do złapania, główny, następny, ostatni z mety, plan B oraz pierwszy pociąg z 2 stacji po drodze)
+  mają odjazd w ciągu 90 min i dane starsze niż 10 min; jeśli tak
+  — `GET /api/v1/operations/train/{sid}/{oid}/{data}` (~3–6 KB) przez `MakeHttpRequest` Karoo
+  (działa przez mostek z telefonem; awaryjnie bezpośrednio). Kafelek nieaktywny i aplikacja
+  zamknięta → zero zapytań. Twardy limit 40 zapytań/h na urządzenie (pakiet Basic: 100/h).
+  Ręcznie tylko przyciskiem „Sprawdź opóźnienia" w zakładce Finisz, widoczny także bez trasy (dotknięcie elementu na kafelku
+  Karoo nie przekazuje — 5.11): do 6 najbliższych pociągów, raz na minutę na pociąg. Dane starsze
+  niż 30 min są ignorowane (wraca rozkład planowy). Kafelek pokazuje w pierwszym wierszu, po prawej,
+  „⏱ N'" — ile minut temu udało się pobrać opóźnienia (szare < 15, żółte < 30, potem czerwone;
+  „⏱ —" gdy jeszcze ani razu); bez zasięgu liczba rośnie.
 - Brak innych timerów i pollingu.
 
 ### 7.4 Kliknięcie
@@ -392,7 +411,7 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 
 Ekrany pod 480×800, cele dotyku ≥ 48 dp, wysoki kontrast, bez animacji. Dane z tego samego repozytorium co kafelek (jedna instancja w procesie).
 
-### 8.1 Zakładka „Meta" (aktywna tylko przy trasie z metą przy stacji)
+### 8.1 Zakładka „Finisz" (do 5.11 „Meta"; aktywna tylko przy trasie z metą przy stacji)
 - Nagłówek: stacja, odległość od mety, ETA mety (źródło: Karoo / ≈).
 - **Przycisk „Prowadź do stacji"** → `LaunchPinDrop(POI stacji)`.
 - Lista następnych 8 pociągów do celów: odjazd, przyjazd, cel, linia, peron/tor, ZKA, klasa (PEWNY / DO ZŁAPANIA + `v_req` / ODPADA wyszarzone), OSTATNI.
@@ -451,7 +470,7 @@ Przykładowe GPX w repo: trasa kończąca się przy stacji KM, przy stacji WKD, 
 
 ## 11. Stabilność i energia — reguły twarde
 
-1. Zero pracy w tle poza: jednorazowe sprawdzenie aktualizacji, subskrypcje potrzebne aktywnym widokom/aplikacji oraz `OnNavigationState` (lekki, potrzebny do powiadomienia).
+1. Zero pracy w tle poza: jednorazowe sprawdzenie aktualizacji, subskrypcje potrzebne aktywnym widokom/aplikacji, `OnNavigationState` (lekki, potrzebny do powiadomienia) oraz opóźnienia z 7.3 (tylko przy aktywnym kafelku lub otwartej aplikacji).
 2. Strumienie ETA/dystansu/prędkości tylko gdy jest trasa **i** (aktywny kafelek **lub** otwarta aplikacja **lub** oczekujące powiadomienie); współdzielone `shareIn(WhileSubscribed(5_000))`.
 3. Żadnych `GlobalScope`, `runBlocking` w ścieżkach UI/serwisu, żadnych pętli z `delay` poza minutowym tikiem z 7.3.
 4. Baza otwierana raz, read-only; kursory w `use {}`.
@@ -459,6 +478,7 @@ Przykładowe GPX w repo: trasa kończąca się przy stacji KM, przy stacji WKD, 
 6. Każdy null/NaN/0/ujemna wartość z Karoo obsłużone.
 7. Logi: plik z rotacją (2 × 256 KB), INFO; DEBUG tylko w debug.
 8. Uprawnienia: `INTERNET`, `ACCESS_NETWORK_STATE` (+ `RECEIVE_BOOT_COMPLETED` tylko jeśli faza 0 tego wymaga).
+10. Klucz API PDP na Karoo: plik `pdp_api_key.txt` wgrany przez `adb push` do `Android/data/<pakiet>/files/`; przy starcie przenoszony do pamięci prywatnej aplikacji i usuwany z katalogu zewnętrznego. Nigdy w APK, `BuildConfig`, logach ani URL. Bez klucza aplikacja działa na samym rozkładzie.
 9. R8/minify w release; reguły keep dla kotlinx.serialization i karoo-ext.
 
 ---
@@ -486,7 +506,7 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 ### Backlog (świadomie później / nie teraz)
 - **Później:** „Plan B" — kafelek z najbliższą stacją od bieżącej pozycji GPS; `InRideAlert` („przechodzę na 18:12", „do odjazdu 15 min"); stacje jako symbole na mapie (`startMap` + `ShowSymbols`); `BonusAction` pod przycisk.
 - **Gdyby rozszerzenie miało być udostępniane:** informacje o przewozie roweru (ZKA zwykle bez rowerów, WKD z płatnym biletem na rower, ew. pole `bikes_allowed`), wielojęzyczność, konfiguracja regionu.
-- **Nie robimy:** opóźnienia na żywo.
+- **W toku (gałąź `pdp-api`):** opóźnienia na żywo — zasady w 7.3 i 11.10.
 
 ---
 
@@ -523,7 +543,8 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 
 - karoo-ext: https://github.com/hammerheadnav/karoo-ext , https://hammerheadnav.github.io/karoo-ext/
 - karoo-ext issue #81: https://github.com/hammerheadnav/karoo-ext/issues/81
-- GTFS (Polish Trains, WKD, Warszawa): https://mkuran.pl/gtfs/
+- API Otwarte Dane Kolejowe PKP PLK: https://pdp-api.plk-sa.pl (Swagger: `/swagger/index.html`, regulamin: `/api/v1/terms`)
+- GTFS (Polish Trains, WKD, Warszawa; źródło do 3.11.2026): https://mkuran.pl/gtfs/
 - Rozmiar feedu Polish Trains: https://mobilitydatabase.org/feeds/gtfs/mdb-3191
 - Headwind (changelogi): https://github.com/timklge/karoo-headwind/releases
 - RouteGraph (changelogi): https://github.com/timklge/karoo-routegraph/releases

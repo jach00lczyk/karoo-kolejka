@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import pl.kolejka.karoo.data.AndroidUpdateEnvironment
+import pl.kolejka.karoo.data.ApiKeyStore
+import pl.kolejka.karoo.data.DelayRepository
 import pl.kolejka.karoo.data.AndroidUpdateHttp
 import pl.kolejka.karoo.data.BundledTimetable
 import pl.kolejka.karoo.data.SettingsRepository
@@ -50,7 +52,10 @@ object AppContainer {
     val source: KarooSource by lazy { RealKarooSource(karoo) }
 
     /** Silnik kafla współdzielony z ekranami aplikacji (SPEC 8: „jedna instancja w procesie"). */
-    val engine: TileEngine by lazy { TileEngine(source, timetable, settings.settings, Clock.systemUTC(), scope) }
+    val engine: TileEngine by lazy { TileEngine(source, timetable, settings.settings, delays, Clock.systemUTC(), scope) }
+
+    /** Opóźnienia na żywo (SPEC 6.8a, 7.3) — wspólne dla kafla i zakładki Meta. */
+    val delays: DelayRepository by lazy { DelayRepository(source, ApiKeyStore(app), Clock.systemUTC(), scope) }
 
     val updateEnv: AndroidUpdateEnvironment by lazy { AndroidUpdateEnvironment(app) }
     val settings: SettingsRepository by lazy { SettingsRepository(app) }

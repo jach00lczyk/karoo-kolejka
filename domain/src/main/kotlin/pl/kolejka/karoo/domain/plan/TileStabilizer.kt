@@ -11,6 +11,7 @@ import java.time.Instant
  * - zmiana na późniejszy pociąg dopiero, gdy zapas obecnego < −1 min przez ≥ 2 min,
  * - powrót do wcześniejszego dopiero, gdy jego zapas ≥ +2 min,
  * - v_req jako średnia krocząca z 60 s.
+ * Kurs odwołany (SPEC 6.8a) nie jest trzymany — przełączamy od razu.
  */
 class TileStabilizer {
     private var current: TrainKey? = null
@@ -30,7 +31,8 @@ class TileStabilizer {
         }
         val smoothed = state.options.map { it.copy(vReqKmh = smooth(it.train.key, it.vReqKmh, now)) }
         val proposed = state.mainIndex
-        val currentIdx = current?.let { key -> smoothed.indexOfFirst { it.train.key == key } }?.takeIf { it >= 0 }
+        val currentIdx = current?.let { key -> smoothed.indexOfFirst { it.train.key == key } }
+            ?.takeIf { it >= 0 && !smoothed[it].train.cancelled }
 
         val mainIdx = when {
             currentIdx == null || currentIdx == proposed -> {

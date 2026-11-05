@@ -2,6 +2,7 @@ package pl.kolejka.karoo
 
 import android.app.Application
 import android.os.SystemClock
+import pl.kolejka.karoo.extension.DemoScenarios
 import pl.kolejka.karoo.log.FileLog
 
 class PociagApp : Application() {
@@ -16,5 +17,6 @@ class PociagApp : Application() {
         }
         // Faza 0: czy proces startuje sam po uruchomieniu Karoo (mały uptime bez akcji użytkownika)?
         FileLog.i("Proces start: v${BuildConfig.VERSION_NAME}, uptime=${SystemClock.elapsedRealtime() / 1000}s")
+        DemoScenarios.register(this) // tylko debug
     }
 }

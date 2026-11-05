@@ -28,7 +28,9 @@ object ServiceTime {
 
     /**
      * Dni kursowania, których kursy mogą odjeżdżać w przedziale [from, to], razem z przedziałem
-     * sekund do zapytania. Przedziały z ujemnym końcem są pomijane.
+     * sekund do zapytania. Przedziały z ujemnym końcem są pomijane. Początek może być ujemny:
+     * w dniu cofnięcia zegara „południe − 12 h" wypada o 01:00 CEST, więc odjazd o 00:30 ma
+     * w rozkładzie −1800 s.
      */
     fun windows(from: Instant, to: Instant): List<Pair<LocalDate, IntRange>> {
         val first = localDate(from).minusDays(LOOKBACK_DAYS)
@@ -36,7 +38,7 @@ object ServiceTime {
         val out = ArrayList<Pair<LocalDate, IntRange>>()
         var d = first
         while (!d.isAfter(last)) {
-            val a = toSeconds(d, from).coerceAtLeast(0)
+            val a = toSeconds(d, from).coerceAtLeast(Int.MIN_VALUE.toLong())
             val b = toSeconds(d, to)
             if (b >= 0 && a <= b) out += d to (a.toInt()..b.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
             d = d.plusDays(1)

@@ -28,4 +28,21 @@ class NameShortenerTest {
         assertEquals("Gdań.", NameShortener.tiny("Warszawa Gdańska"))
         assertEquals("Otwo.", NameShortener.tiny("Otwock"))
     }
+
+    @Test
+    fun `warsaw shortened first, then the start station`() {
+        assertEquals("W-wa Gd.", NameShortener.warsawShort("Warszawa Gdańska"))
+        assertEquals("W-wa Śr. WKD", NameShortener.warsawShort("Warszawa Śródmieście WKD"))
+        assertEquals("W-wa Ochota", NameShortener.warsawShort("Warszawa Ochota"))
+        assertEquals(
+            listOf(
+                "Mińsk Mazowiecki → W-wa Gdańska",
+                "Mińsk Mazowiecki → W-wa Gd.",
+                "Mińsk Maz. → W-wa Gd.",
+                "Mińsk Ma… → W-wa Gd.",
+            ),
+            NameShortener.fromToVariants("Mińsk Mazowiecki", "Warszawa Gdańska"),
+        )
+        assertEquals(listOf("Mrozy → W-wa Śródm.", "Mrozy → W-wa Śr."), NameShortener.fromToVariants("Mrozy", "Warszawa Śródmieście"))
+    }
 }

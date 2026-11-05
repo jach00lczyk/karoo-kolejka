@@ -2,6 +2,7 @@ package pl.kolejka.karoo.domain.timetable
 
 import pl.kolejka.karoo.domain.model.Connection
 import pl.kolejka.karoo.domain.model.Station
+import pl.kolejka.karoo.domain.model.TrainRef
 import java.time.LocalDate
 
 /** Rozkład w pamięci — testy i tryb symulacji. Semantyka identyczna jak zapytanie SQLite. */
@@ -29,6 +30,8 @@ class InMemoryTimetable(
         val routeShortName: String? = null,
         val headsign: String? = null,
         val isBus: Boolean = false,
+        /** `orderId` w API PDP (ten sam dla wszystkich dat; `scheduleId` = rok dat). */
+        val pdpOid: Long? = null,
     )
 
     override fun connections(from: Set<Int>, targets: Set<Int>, serviceDate: LocalDate, depRange: IntRange): List<Connection> {
@@ -45,6 +48,7 @@ class InMemoryTimetable(
                             toStationId = b.stationId, arrS = b.arrS,
                             platform = a.platform, track = a.track,
                             agency = t.agency, routeShortName = t.routeShortName, headsign = t.headsign, isBus = t.isBus,
+                            ref = t.pdpOid?.let { TrainRef(serviceDate.year, it, serviceDate) },
                         )
                     }
                 }

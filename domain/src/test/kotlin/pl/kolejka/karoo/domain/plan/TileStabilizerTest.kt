@@ -36,6 +36,19 @@ class TileStabilizerTest {
     private fun TileState.main() = (this as TileState.Ok).main.train.tripId
 
     @Test
+    fun `cancelled main is not held by hysteresis`() {
+        val s = TileStabilizer()
+        s.apply(state(0), t0)
+        val st = state(0)
+        val cancelledMain = st.options[1].let { o ->
+            o.copy(train = o.train.copy(live = pl.kolejka.karoo.domain.model.LiveTimes(null, null, cancelled = true, checkedAt = t0)), cls = TrainClass.MISSED)
+        }
+        val options = st.options.toMutableList().also { it[1] = cancelledMain }
+        // Planer proponuje pociąg 3; bez odwołania histereza trzymałaby pociąg 2.
+        assertEquals(3, s.apply(st.copy(options = options, mainIndex = 2), t0.plusSeconds(10)).main())
+    }
+
+    @Test
     fun `first result is accepted as is`() {
         assertEquals(2, TileStabilizer().apply(state(0), t0).main())
     }
