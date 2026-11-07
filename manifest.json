@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "version": "20261107-c500bc48",
+  "sha256": "8a575b3ff81688734d5ba7b383337512628e240908de69f76d3a890abaa85dc2",
+  "size_bytes": 1201347,
+  "url": "timetable-20261107-c500bc48.sqlite.gz",
+  "generated_at": "2026-11-07T02:18:16+00:00",
+  "valid_from": "2026-11-06",
+  "valid_to": "2026-11-21",
+  "sources": {
+    "pdp": {
+      "schedules_version": "3303196d-2312-48e9-8a73-659b47c349be"
+    }
+  }
+}
