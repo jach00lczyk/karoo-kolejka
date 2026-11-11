@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-11-11
+
 ### Opóźnienia dla wszystkich pociągów z kafelka (2026-11-11)
 
 - Pociągi z kafelka sprawdzane zawsze, także z odjazdem za kilka godzin — progresywnie:
@@ -56,6 +58,8 @@
 - Domyślny zapas na peronie 2 min (było 5); zapisane ustawienia się nie zmieniają.
 - Tryb demo kafelka (tylko debug): 8 zmyślonych scenariuszy, przełączanie z adb lub w Opcjach.
 - Log kafla zawiera dystans i kilometr stacji po drodze (zgłoszony podejrzany dystans do Żyrardowa).
+
+## [0.3.0] — 2026-11-03
 
 ### Opóźnienia na żywo (2026-11-03, gałąź `pdp-api`, wersja 0.3.0)
 
