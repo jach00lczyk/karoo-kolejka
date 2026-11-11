@@ -41,7 +41,6 @@ class SettingsRepository(private val context: Context) {
             prefs[MODE] = s.mode.name
             prefs[STRICT_TOLERANCE] = s.strictToleranceMin
             prefs[TILE_CLICKABLE] = s.tileClickable
-            prefs[NOTIFICATIONS] = s.notifications
             val targets = s.targets
             if (targets == null) prefs.remove(TARGETS) else prefs[TARGETS] = Settings.encodeTargets(targets)
         }
@@ -59,7 +58,6 @@ class SettingsRepository(private val context: Context) {
             mode = this[MODE]?.let { runCatching { PreferenceMode.valueOf(it) }.getOrNull() } ?: d.mode,
             strictToleranceMin = this[STRICT_TOLERANCE] ?: d.strictToleranceMin,
             tileClickable = this[TILE_CLICKABLE] ?: d.tileClickable,
-            notifications = this[NOTIFICATIONS] ?: d.notifications,
             targets = this[TARGETS]?.let(Settings::decodeTargets),
         )
     }
@@ -74,7 +72,6 @@ class SettingsRepository(private val context: Context) {
         val MODE = stringPreferencesKey("mode")
         val STRICT_TOLERANCE = intPreferencesKey("strict_tolerance_min")
         val TILE_CLICKABLE = booleanPreferencesKey("tile_clickable")
-        val NOTIFICATIONS = booleanPreferencesKey("notifications")
         val TARGETS = stringPreferencesKey("targets")
     }
 }

@@ -13,7 +13,7 @@ Rozszerzenie karoo-ext, które:
 
 1. Przy starcie urządzenia sprawdza, czy jest nowszy rozkład **KM + SKM Warszawa + WKD**, i jeśli tak — pobiera **mały, wstępnie przetworzony plik SQLite** (nie surowy GTFS) i zapisuje go lokalnie.
 2. Po wybraniu (lub zmianie) trasy sprawdza, czy **meta** leży ≤ 1 km od stacji. Jeśli tak — bierze ETA z Karoo, dolicza dojazd do stacji + zapas i znajduje pociągi do **stacji docelowych** (domyślnie: Warszawa Gdańska → Wileńska → Śródmieście; lista konfigurowalna, dowolnej długości).
-3. Od razu po wybraniu trasy wysyła **powiadomienie** z podsumowaniem („Meta przy stacji X, pociągi: …").
+3. ~~Od razu po wybraniu trasy wysyła **powiadomienie** z podsumowaniem.~~ Zrezygnowano (11.11.2026) — patrz 5.3.
 4. Pokazuje **kafelek** (graficzne pole danych) w kilku rozmiarach: od jednego pociągu po listę 3 pociągów z wymaganą prędkością („zdążę?"), peronem i oznaczeniem ostatniego pociągu.
 5. Kliknięcie kafelka otwiera aplikację: **Meta** (z przyciskiem „Prowadź do stacji"), **Po drodze**, **Wszystkie stacje** (lista + wyszukiwarka). Bez trasy kafelek mówi „Brak trasy", a kliknięcie otwiera rozkład.
 
@@ -41,7 +41,7 @@ Kod i dane w **jednym publicznym repo**:
 - GitHub Actions na standardowych runnerach w repo publicznym są **bezpłatne**.
 - Dane publikowane na gałęzi **`gh-pages` jako orphan, force-push jednym commitem** (historia nie rośnie o kilka MB dziennie) → serwowane przez GitHub Pages pod stałym URL, bez tokena.
 - Codzienny push na `gh-pages` jest jednocześnie „aktywnością repo" — GitHub wyłącza zaplanowane workflowy w repo publicznym po 60 dniach bez aktywności. Gdyby mimo to cron się wyłączył, aplikacja pokaże `DataStale` (sekcja 5.1).
-- APK publikowany w GitHub Releases → umożliwia aktualizację z poziomu Karoo (sekcja 4.3).
+- ~~APK publikowany w GitHub Releases~~ — zrezygnowano (sekcja 4.3); APK z artefaktu CI lub lokalnego buildu.
 
 ### 1.3 Przechowywanie na urządzeniu
 
@@ -215,6 +215,8 @@ Test pipeline'u sprawdza, że wszystkie zostały znalezione (uwaga na pomylenie 
 
 ### 4.3 Aktualizacja aplikacji z Karoo (tanie, bo repo publiczne)
 
+**Zrezygnowano (11.11.2026)** — Karoo i tak podłączam kablem, APK instaluję przez `adb install -r`. Pierwotny plan:
+
 karoo-ext przewiduje manifest aplikacji (`KarooAppManifest`: `label`, `packageName`, `latestApkUrl`, `latestVersion`, `latestVersionCode`, `releaseNotes` …) wskazywany w metadanych. Workflow `android.yml` przy tagu `v*` publikuje APK w Releases i aktualizuje `app-manifest.json` na `gh-pages`. Efekt: Karoo pokazuje „Update" w bibliotece rozszerzeń, bez kabla. (Faza 6.)
 
 ---
@@ -236,7 +238,7 @@ Rozszerzenie musi poprawnie działać, gdy użytkownik **wybiera, zmienia, odwra
 ```
 
 - `routeKey` = hash z (`routePolyline`, `reversed`, typ nawigacji, dla `NavigatingToDestination` — współrzędne celu). **Nie** wchodzi do niego `rejoinPolyline` (rejoin to chwilowy objazd do tej samej trasy, meta się nie zmienia).
-- Każda zmiana `routeKey` → **anulowanie** bieżących obliczeń (`flatMapLatest`/`collectLatest`), wyczyszczenie stanu „Po drodze", nowe obliczenia, nowe powiadomienie (5.3).
+- Każda zmiana `routeKey` → **anulowanie** bieżących obliczeń (`flatMapLatest`/`collectLatest`), wyczyszczenie stanu „Po drodze", nowe obliczenia.
 - Debounce 500 ms na zmianach nawigacji (Karoo potrafi wyemitować kilka stanów pod rząd przy wyborze trasy).
 - Cache wyników geo (kandydaci na metę, stacje po drodze) w LRU (rozmiar 4) po `routeKey` — powrót do poprzedniej trasy bez przeliczania.
 - `Idle` → stan `NoRoute` natychmiast; ETA-strumienie odsubskrybowane (oszczędność).
@@ -249,11 +251,8 @@ Rozszerzenie musi poprawnie działać, gdy użytkownik **wybiera, zmienia, odwra
 
 ### 5.3 Powiadomienie po wybraniu trasy
 
-Po pierwszym `Ready` dla nowego `routeKey` (raz na trasę, dedup po `routeKey`):
-- meta przy stacji: `SystemNotification(header = "Pociąg do Warszawy", message = "Meta: Mińsk Maz. (0,4 km)", subText = "17:12 · 17:42 · 18:12 → W-wa Wileńska")`, kliknięcie → aplikacja, zakładka Meta,
-- meta bez stacji, ale są stacje po drodze: „Meta 2,4 km od stacji. Po drodze: 3 stacje" → zakładka Po drodze,
-- brak stacji w ogóle: bez powiadomienia,
-- ustawienie do wyłączenia powiadomień (domyślnie ON).
+**Zrezygnowano (11.11.2026).** Kafelek pokazuje to samo od razu po wyborze trasy, a powiadomienie
+tylko zasłaniało ekran. Usunięte także ustawienie „Powiadomienie po wyborze trasy".
 
 ---
 
@@ -391,13 +390,20 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 - **Opóźnienia na żywo (od 3.11.2026)** — jedyny polling, i to bez własnego timera: przy każdym
   przeliczeniu z minutowego tiku `DelayPolicy` sprawdza, czy pociągi pokazane na kafelku
   (do złapania, główny, następny, ostatni z mety, plan B oraz pierwszy pociąg z 2 stacji po drodze)
-  mają odjazd w ciągu 90 min i dane starsze niż 10 min; jeśli tak
+  mają dane starsze niż interwał zależny od czasu do odjazdu: < 30 min → co 5 min, < 90 min → co
+  10 min, dalej → co 30 min (od 11.11.2026; wcześniej tylko pociągi w ciągu 90 min — odwołania
+  ogłoszonych rano nie było widać z daleka); jeśli tak
   — `GET /api/v1/operations/train/{sid}/{oid}/{data}` (~3–6 KB) przez `MakeHttpRequest` Karoo
   (działa przez mostek z telefonem; awaryjnie bezpośrednio). Kafelek nieaktywny i aplikacja
-  zamknięta → zero zapytań. Twardy limit 40 zapytań/h na urządzenie (pakiet Basic: 100/h).
+  zamknięta → zero zapytań. Zmiana trasy nawigacji (inna polyline/kierunek albo inny cel pinezki —
+  `RouteKey.trip()`) → przy pierwszym przeliczeniu sprawdzane od razu wszystkie pokazane pociągi
+  poza pobranymi w ostatniej minucie. Reroute (zjazd z trasy, nowa droga do tej samej pinezki),
+  przełączenie strony z kafelkiem i ponowny wybór tej samej trasy nic nie wymuszają.
+  Twardy limit 60 zapytań/h na urządzenie (pakiet Basic: 100/h); przy niedoborze pierwszeństwo
+  mają najbliższe odjazdy.
   Ręcznie tylko przyciskiem „Sprawdź opóźnienia" w zakładce Finisz, widoczny także bez trasy (dotknięcie elementu na kafelku
   Karoo nie przekazuje — 5.11): do 6 najbliższych pociągów, raz na minutę na pociąg. Dane starsze
-  niż 30 min są ignorowane (wraca rozkład planowy). Kafelek pokazuje w pierwszym wierszu, po prawej,
+  niż 35 min są ignorowane (wraca rozkład planowy). Kafelek pokazuje w pierwszym wierszu, po prawej,
   „⏱ N'" — ile minut temu udało się pobrać opóźnienia (szare < 15, żółte < 30, potem czerwone;
   „⏱ —" gdy jeszcze ani razu); bez zasięgu liczba rośnie.
 - Brak innych timerów i pollingu.
@@ -429,7 +435,7 @@ Ekrany pod 480×800, cele dotyku ≥ 48 dp, wysoki kontrast, bez animacji. Dane 
 
 ### 8.4 Ustawienia i „O danych"
 - Stacje docelowe (edytor listy grup, 6.1).
-- Promienie (meta, po drodze), prędkość dojazdu do stacji, zapas, prędkość fallback, `v_max` dla „do złapania", tryb preferencji, klikalność kafelka, powiadomienia.
+- Promienie (meta, po drodze), prędkość dojazdu do stacji, zapas, prędkość fallback, `v_max` dla „do złapania", tryb preferencji, klikalność kafelka.
 - Zapis natychmiast przy zmianie (DataStore).
 - „O danych": wersja, data generacji, ważność, „Sprawdź aktualizację", atrybucja źródeł, ostatnie 200 linii logu.
 
@@ -470,8 +476,8 @@ Przykładowe GPX w repo: trasa kończąca się przy stacji KM, przy stacji WKD, 
 
 ## 11. Stabilność i energia — reguły twarde
 
-1. Zero pracy w tle poza: jednorazowe sprawdzenie aktualizacji, subskrypcje potrzebne aktywnym widokom/aplikacji, `OnNavigationState` (lekki, potrzebny do powiadomienia) oraz opóźnienia z 7.3 (tylko przy aktywnym kafelku lub otwartej aplikacji).
-2. Strumienie ETA/dystansu/prędkości tylko gdy jest trasa **i** (aktywny kafelek **lub** otwarta aplikacja **lub** oczekujące powiadomienie); współdzielone `shareIn(WhileSubscribed(5_000))`.
+1. Zero pracy w tle poza: jednorazowe sprawdzenie aktualizacji, subskrypcje potrzebne aktywnym widokom/aplikacji, `OnNavigationState` (lekki) oraz opóźnienia z 7.3 (tylko przy aktywnym kafelku lub otwartej aplikacji).
+2. Strumienie ETA/dystansu/prędkości tylko gdy jest trasa **i** (aktywny kafelek **lub** otwarta aplikacja); współdzielone `shareIn(WhileSubscribed(5_000))`.
 3. Żadnych `GlobalScope`, `runBlocking` w ścieżkach UI/serwisu, żadnych pętli z `delay` poza minutowym tikiem z 7.3.
 4. Baza otwierana raz, read-only; kursory w `use {}`.
 5. Geometria raz na `routeKey`, cache LRU.
@@ -499,9 +505,9 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 
 **Faza 5 — Kafelek.** 3 warianty, wszystkie stany, preview, pipeline z 7.3, deep linki, obejście P1.
 
-**Faza 6 — Aplikacja + powiadomienie.** Zakładki, „Prowadź do stacji", edytor celów, ustawienia, „O danych", powiadomienie po wyborze trasy, aktualizacja APK przez `KarooAppManifest`.
+**Faza 6 — Aplikacja.** Zakładki, „Prowadź do stacji", edytor celów, ustawienia, „O danych". (Powiadomienie po wyborze trasy i aktualizacja APK przez `KarooAppManifest` — zrezygnowano 11.11.2026; APK instalowane przez `adb`.)
 
-**Faza 7 — Utwardzanie na rowerze.** Trasy z GPX z sekcji 10 w realu; zmiany trasy w trakcie jazdy; brak sieci; restart Karoo; pomiar CPU serwisu przez 1 h jazdy (cel: brak zauważalnego wpływu na baterię).
+**Zrezygnowano (11.11.2026)** z formalnej fazy 7 i z backlogu — aplikacja sprawdzona w jeździe, poprawki na bieżąco. **Faza 7 — Utwardzanie na rowerze.** Trasy z GPX z sekcji 10 w realu; zmiany trasy w trakcie jazdy; brak sieci; restart Karoo; pomiar CPU serwisu przez 1 h jazdy (cel: brak zauważalnego wpływu na baterię).
 
 ### Backlog (świadomie później / nie teraz)
 - **Później:** „Plan B" — kafelek z najbliższą stacją od bieżącej pozycji GPS; `InRideAlert` („przechodzę na 18:12", „do odjazdu 15 min"); stacje jako symbole na mapie (`startMap` + `ShowSymbols`); `BonusAction` pod przycisk.
@@ -520,14 +526,14 @@ Każda faza kończy się zielonym `./gradlew test` (i `pytest`) oraz wpisem w `C
 - Bez nowego pollingu/timerów bez wpisu w sekcji 7.3/11.
 - Teksty UI po polsku w `strings.xml`.
 - Repo jest publiczne: żadnych sekretów w plikach; token GitHub Packages tylko w `~/.gradle/gradle.properties` i sekretach CI.
-- Instalacja: `adb install -r` lub aktualizacja przez manifest (4.3); po aktualizacji zrestartuj Karoo (P6).
+- Instalacja tylko `adb install -r` (bez aktualizacji przez manifest, 4.3); po aktualizacji zrestartuj Karoo (P6).
 
 ---
 
 ## 14. Kryteria akceptacji
 
 1. Po włączeniu Karoo z Wi-Fi dane aktualne w < 60 s; bez sieci działa na starych danych i to sygnalizuje.
-2. Wybór trasy kończącej się ≤ 1 km od stacji KM/SKM/WKD → w < 3 s kafelek pokazuje odjazd, przyjazd, stacje (i peron, jeśli jest w danych), a Karoo wyświetla powiadomienie.
+2. Wybór trasy kończącej się ≤ 1 km od stacji KM/SKM/WKD → w < 3 s kafelek pokazuje odjazd, przyjazd, stacje (i peron, jeśli jest w danych).
 3. Zmiana trasy w trakcie jazdy → kafelek i zakładki przeliczone dla nowej trasy w < 3 s, bez pozostałości po starej; powrót do poprzedniej trasy bez ponownego liczenia geometrii.
 4. Wyłączenie nawigacji → „Brak trasy"; kliknięcie otwiera listę wszystkich stacji.
 5. Przyspieszenie (symulacja las→asfalt) → pociąg „do złapania" pokazuje malejącą wymaganą prędkość i staje się „pewnym" bez skakania kafelka tam i z powrotem.

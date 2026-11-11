@@ -105,7 +105,6 @@ data class Settings(
     val mode: PreferenceMode = PreferenceMode.FASTEST,
     val strictToleranceMin: Int = 30,
     val tileClickable: Boolean = true,
-    val notifications: Boolean = true,
     /** Grupy stacji docelowych (SPEC 6.1); null = domyślne z rozkładu (`meta.default_targets`). */
     val targets: List<Set<Int>>? = null,
 ) {

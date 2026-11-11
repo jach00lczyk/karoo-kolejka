@@ -11,6 +11,8 @@ import pl.kolejka.karoo.domain.delay.DelayPolicy
 import pl.kolejka.karoo.domain.delay.TrainRun
 import pl.kolejka.karoo.domain.model.Train
 import pl.kolejka.karoo.domain.model.TrainRef
+import pl.kolejka.karoo.domain.route.RouteKey
+import pl.kolejka.karoo.domain.route.trip
 import pl.kolejka.karoo.extension.HttpResult
 import pl.kolejka.karoo.extension.KarooSource
 import pl.kolejka.karoo.log.FileLog
@@ -25,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 /** Wynik przycisku „Sprawdź opóźnienia" — każdy przypadek ma inny komunikat. */
 sealed interface RefreshResult {
     data object NoKey : RefreshResult
-    /** Żaden pociąg (z ID kursu) nie odjeżdża w ciągu 3 h — nie ma o co pytać. */
+    /** Brak nadchodzących pociągów z ID kursu — nie ma o co pytać. */
     data object NoTrains : RefreshResult
     /** Wszystkie sprawdzone przed chwilą (limit raz na minutę) lub wyczerpany limit godzinowy. */
     data object TooSoon : RefreshResult
@@ -75,6 +77,14 @@ class DelayRepository(
                 FileLog.w("Opóźnienia: błąd", e)
             }
         }
+    }
+
+    /**
+     * Trasa nawigacji gotowa. Inna niż poprzednio → przy najbliższym [onShown] sprawdź od razu
+     * wszystkie pokazane pociągi; reroute i ta sama trasa nic nie wymuszają (SPEC 7.3).
+     */
+    fun onRoute(key: RouteKey) {
+        if (policy.onRoute(key.trip(), clock.instant())) FileLog.i("Opóźnienia: nowa trasa — sprawdzam od razu")
     }
 
     /** Przycisk „Sprawdź opóźnienia". */

@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-11-11
+
+### Opóźnienia dla wszystkich pociągów z kafelka (2026-11-11)
+
+- Pociągi z kafelka sprawdzane zawsze, także z odjazdem za kilka godzin — progresywnie:
+  < 30 min do odjazdu co 5 min, < 90 min co 10 min, dalej co 30 min. Wcześniej pociągi dalej niż
+  90 min nie były sprawdzane, więc odwołanie ogłoszone rano wychodziło dopiero przed stacją,
+  a „⏱ —" świeciło na czerwono jak błąd.
+- Zmiana trasy nawigacji → od razu sprawdzenie wszystkich pokazanych pociągów (poza pobranymi
+  w ostatniej minucie). Reroute — zjazd z trasy albo nowa droga do tej samej pinezki — oraz
+  przełączenie strony z kafelkiem niczego nie wymuszają.
+- Limit 40 → 60 zapytań/h (pakiet Basic: 100/h): typowo 1–2 pociągi co 5 min + 2 co 10 min +
+  reszta co 30 min ≈ 40/h, zapas na zmiany trasy i przycisk.
+- Dane na żywo ważne 35 zamiast 30 min — przy interwale 30 min odwołanie nie może „mignąć"
+  rozkładem planowym tuż przed odświeżeniem.
+- Przycisk „Sprawdź opóźnienia" bez limitu 3 h.
+
+### Porządki: README, bez powiadomienia (2026-11-11)
+
+- README przepisane: co robi kafelek i aplikacja, instalacja krok po kroku, log; bez
+  nieaktualnego „Stanu".
+- Usunięte ustawienie „Powiadomienie po wyborze trasy" — powiadomienia nigdy nie
+  zaimplementowano i nie będzie (SPEC 5.3). Zrezygnowano też z aktualizacji APK przez manifest
+  i z fazy 7 — instalacja przez `adb`.
+- Opis pola bez „(wersja testowa)"; ekran „O danych" nie zapowiada już zakładek.
+
 ### Komunikaty sprawdzania opóźnień (2026-11-05)
 
 - Przycisk „Sprawdź opóźnienia" rozróżnia: nic do sprawdzenia (brak pociągu w ciągu 3 h),
@@ -32,6 +58,8 @@
 - Domyślny zapas na peronie 2 min (było 5); zapisane ustawienia się nie zmieniają.
 - Tryb demo kafelka (tylko debug): 8 zmyślonych scenariuszy, przełączanie z adb lub w Opcjach.
 - Log kafla zawiera dystans i kilometr stacji po drodze (zgłoszony podejrzany dystans do Żyrardowa).
+
+## [0.3.0] — 2026-11-03
 
 ### Opóźnienia na żywo (2026-11-03, gałąź `pdp-api`, wersja 0.3.0)
 

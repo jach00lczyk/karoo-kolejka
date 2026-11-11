@@ -13,7 +13,7 @@ Priorytet: **stabilność i energooszczędność ponad liczbę funkcji.**
 - Bez nowego pollingu/timerów bez wpisu w SPEC 7.3/11.
 - Teksty UI po polsku w `strings.xml`.
 - Repo jest publiczne: żadnych sekretów w plikach; token GitHub Packages tylko w `~/.gradle/gradle.properties` i sekretach CI.
-- Instalacja: `adb install -r` lub aktualizacja przez manifest (SPEC 4.3); po aktualizacji zrestartuj Karoo (P6).
+- Instalacja tylko `adb install -r` (bez aktualizacji przez manifest); po aktualizacji zrestartuj Karoo (P6).
 - Każda faza kończy się zielonym `./gradlew test` i `pytest` oraz wpisem w `CHANGELOG.md`.
 
 ## Android

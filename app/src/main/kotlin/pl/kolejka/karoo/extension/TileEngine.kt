@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import pl.kolejka.karoo.data.DelayRepository
 import pl.kolejka.karoo.data.SqliteTimetable
@@ -106,6 +107,8 @@ class TileEngine(
                         }
                         is RouteState.Computing -> flowOf(TileModel(TileState.Computing, stationName = nameOf))
                         is RouteState.Ready -> combine(rawStreams(), minuteTicker(), delays.runs, delays.status) { raw, _, runs, st -> Input(raw, runs, st, inputKey(raw)) }
+                            // Nowa trasa (nie reroute) → opóźnienia pokazanych pociągów od razu (SPEC 7.3).
+                            .onStart { delays.onRoute(rs.key) }
                             // Przeliczaj tylko przy istotnej zmianie wejścia lub opóźnień (SPEC 7.3).
                             .distinctUntilChanged { a, b -> a.key == b.key && a.runs === b.runs && a.status == b.status }
                             .conflate()
