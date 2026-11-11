@@ -96,7 +96,6 @@ fun SettingsScreen(data: AppData, onAddTarget: () -> Unit) {
             stepper(R.string.settings_strict_tolerance, settings.strictToleranceMin, 5, 90, 5, R.string.unit_min) { v -> update { it.copy(strictToleranceMin = v) } }
         }
         item { SwitchRow(stringResource(R.string.settings_tile_clickable), settings.tileClickable) { v -> update { it.copy(tileClickable = v) } } }
-        item { SwitchRow(stringResource(R.string.settings_notifications), settings.notifications) { v -> update { it.copy(notifications = v) } } }
         if (BuildConfig.DEBUG) item { DemoControls() }
 
         aboutItems(data)

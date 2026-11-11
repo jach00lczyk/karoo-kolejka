@@ -18,7 +18,6 @@
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
-                <!-- Cel SystemNotification.actionIntent (faza 0 sprawdza, czy działa) -->
                 <action android:name="pl.kolejka.karoo.MAIN" />
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

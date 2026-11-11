@@ -17,6 +17,15 @@
   rozkładem planowym tuż przed odświeżeniem.
 - Przycisk „Sprawdź opóźnienia" bez limitu 3 h.
 
+### Porządki: README, bez powiadomienia (2026-11-11)
+
+- README przepisane: co robi kafelek i aplikacja, instalacja krok po kroku, log; bez
+  nieaktualnego „Stanu".
+- Usunięte ustawienie „Powiadomienie po wyborze trasy" — powiadomienia nigdy nie
+  zaimplementowano i nie będzie (SPEC 5.3). Zrezygnowano też z aktualizacji APK przez manifest
+  i z fazy 7 — instalacja przez `adb`.
+- Opis pola bez „(wersja testowa)"; ekran „O danych" nie zapowiada już zakładek.
+
 ### Komunikaty sprawdzania opóźnień (2026-11-05)
 
 - Przycisk „Sprawdź opóźnienia" rozróżnia: nic do sprawdzenia (brak pociągu w ciągu 3 h),
