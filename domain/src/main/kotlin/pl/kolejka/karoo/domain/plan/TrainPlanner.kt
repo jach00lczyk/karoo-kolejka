@@ -307,7 +307,7 @@ class TrainPlanner(private val timetable: Timetable, private val clock: Clock) {
         val SAFE_PLAN_SLACK: Duration = Duration.ofMinutes(10)
 
         /** Starsze dane o opóźnieniu ignorujemy — wraca rozkład planowy (SPEC 7.3). */
-        val MAX_RUN_AGE: Duration = Duration.ofMinutes(30)
+        val MAX_RUN_AGE: Duration = Duration.ofMinutes(35)
         val LIVE_LOOKBACK: Duration = Duration.ofHours(1)
 
         /** Koniec „dnia" dla ostatniego pociągu: najbliższa 03:00 lokalnego czasu po [t]. */

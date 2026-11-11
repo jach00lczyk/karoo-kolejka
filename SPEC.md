@@ -391,13 +391,20 @@ combine(routeResult, etaMinute, timetableVersion, targets, settings)
 - **Opóźnienia na żywo (od 3.11.2026)** — jedyny polling, i to bez własnego timera: przy każdym
   przeliczeniu z minutowego tiku `DelayPolicy` sprawdza, czy pociągi pokazane na kafelku
   (do złapania, główny, następny, ostatni z mety, plan B oraz pierwszy pociąg z 2 stacji po drodze)
-  mają odjazd w ciągu 90 min i dane starsze niż 10 min; jeśli tak
+  mają dane starsze niż interwał zależny od czasu do odjazdu: < 30 min → co 5 min, < 90 min → co
+  10 min, dalej → co 30 min (od 11.11.2026; wcześniej tylko pociągi w ciągu 90 min — odwołania
+  ogłoszonych rano nie było widać z daleka); jeśli tak
   — `GET /api/v1/operations/train/{sid}/{oid}/{data}` (~3–6 KB) przez `MakeHttpRequest` Karoo
   (działa przez mostek z telefonem; awaryjnie bezpośrednio). Kafelek nieaktywny i aplikacja
-  zamknięta → zero zapytań. Twardy limit 40 zapytań/h na urządzenie (pakiet Basic: 100/h).
+  zamknięta → zero zapytań. Zmiana trasy nawigacji (inna polyline/kierunek albo inny cel pinezki —
+  `RouteKey.trip()`) → przy pierwszym przeliczeniu sprawdzane od razu wszystkie pokazane pociągi
+  poza pobranymi w ostatniej minucie. Reroute (zjazd z trasy, nowa droga do tej samej pinezki),
+  przełączenie strony z kafelkiem i ponowny wybór tej samej trasy nic nie wymuszają.
+  Twardy limit 60 zapytań/h na urządzenie (pakiet Basic: 100/h); przy niedoborze pierwszeństwo
+  mają najbliższe odjazdy.
   Ręcznie tylko przyciskiem „Sprawdź opóźnienia" w zakładce Finisz, widoczny także bez trasy (dotknięcie elementu na kafelku
   Karoo nie przekazuje — 5.11): do 6 najbliższych pociągów, raz na minutę na pociąg. Dane starsze
-  niż 30 min są ignorowane (wraca rozkład planowy). Kafelek pokazuje w pierwszym wierszu, po prawej,
+  niż 35 min są ignorowane (wraca rozkład planowy). Kafelek pokazuje w pierwszym wierszu, po prawej,
   „⏱ N'" — ile minut temu udało się pobrać opóźnienia (szare < 15, żółte < 30, potem czerwone;
   „⏱ —" gdy jeszcze ani razu); bez zasięgu liczba rośnie.
 - Brak innych timerów i pollingu.

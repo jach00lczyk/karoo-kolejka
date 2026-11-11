@@ -137,6 +137,14 @@ class TrainPlannerTest {
     }
 
     @Test
+    fun `live data from far-train interval is still used just past 30 minutes`() {
+        // dalekie pociągi sprawdzane co 30 min — dane sprzed 32 min nie mogą jeszcze zniknąć
+        val st = plan(now = at(16, 30), eta = at(17, 20), trips = liveTrips, runs = mapOf(run(101, 1, at(17, 32), at(15, 58)))) as TileState.Ok
+        assertEquals(1, st.main.train.tripId)
+        assertEquals(20, st.main.train.delayMin)
+    }
+
+    @Test
     fun `train planned before window but delayed into it is found`() {
         // now 17:40, meta 18:00 → t_ready 18:06:36, okno od 17:36:36; T1 planowo 17:12, prognoza 17:50
         val st = plan(now = at(17, 40), eta = at(18, 0), trips = liveTrips, runs = mapOf(run(101, 1, at(17, 50), at(17, 39)))) as TileState.Ok

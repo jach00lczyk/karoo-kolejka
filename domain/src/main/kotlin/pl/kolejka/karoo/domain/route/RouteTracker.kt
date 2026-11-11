@@ -52,6 +52,13 @@ fun NavInput.routeKey(): RouteKey? = when (this) {
     is NavInput.Destination -> RouteKey('D', polyline, false, destination)
 }
 
+/**
+ * Która to „wyprawa" z punktu widzenia użytkownika: trasa (polyline + kierunek) albo cel pinezki.
+ * Reroute do pinezki zmienia polyline, ale nie cel — to nie jest zmiana trasy (np. dla opóźnień).
+ * Zjazd z trasy nie zmienia nawet [RouteKey] (Karoo dosyła tylko `rejoinPolyline`).
+ */
+fun RouteKey.trip(): Any = if (type == 'D') "D" to destination else this
+
 /** Parametry wpływające na geometrię; ich zmiana unieważnia wynik dla tej samej trasy. */
 data class GeometryConfig(val finishRadiusM: Double, val routeRadiusM: Double)
 

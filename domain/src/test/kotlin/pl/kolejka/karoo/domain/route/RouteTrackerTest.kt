@@ -137,4 +137,17 @@ class RouteTrackerTest {
         assertEquals(null, c[1])
         assertEquals("v5", c[5])
     }
+
+    @Test
+    fun `trip identity ignores reroute to the same pin and rejoin`() {
+        val pin = LatLon(52.25, 21.0)
+        val a = NavInput.Destination(pin, "aaaa").routeKey()!!
+        val b = NavInput.Destination(pin, "bbbb").routeKey()!!
+        assertEquals(a.trip(), b.trip())
+        assertTrue(a.trip() != NavInput.Destination(LatLon(52.3, 21.0), "aaaa").routeKey()!!.trip())
+        val r = NavInput.Route("pppp", 1000.0, false, rejoinPolyline = "x").routeKey()!!
+        assertEquals(r.trip(), NavInput.Route("pppp", 1000.0, false, rejoinPolyline = "y").routeKey()!!.trip())
+        assertTrue(r.trip() != NavInput.Route("pppp", 1000.0, true).routeKey()!!.trip())
+        assertTrue(r.trip() != NavInput.Route("qqqq", 1000.0, false).routeKey()!!.trip())
+    }
 }
