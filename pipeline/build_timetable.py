@@ -76,7 +76,15 @@ BUS_PLATFORM = "BUS"
 
 WINDOW_BEFORE_DAYS = 1
 WINDOW_AFTER_DAYS = 14
+# Kursy KM/SKM/ŁKA krótsze niż dziś+7 → rozkład okrojony: publikujemy z ostrzeżeniem, byle był
+# przynajmniej na dziś (decyzja właściciela 24.11.2026) i nie krótszy od poprzedniej publikacji.
 MIN_VALID_AHEAD_DAYS = 7
+# WKD jest „na ostateczność" (właściciel nią nie jeździ, 24.11.2026): jej braki nie blokują
+# publikacji, tylko dają ostrzeżenie (workflow kończy się wtedy błędem po publikacji →
+# powiadomienie z GitHub). WKD ma w API PDP osobne zamówienie na każdy dzień i publikuje je
+# tylko ~tydzień naprzód (24.11: kursy do 30.11 = dziś+6), stąd krótszy próg ostrzeżenia.
+OPTIONAL_AGENCIES = {"WKD"}
+OPTIONAL_MIN_VALID_AHEAD_DAYS = 3
 MAX_DB_BYTES = 10 * 1024 * 1024
 GROUP_RADIUS_M = 700.0
 # Dane opublikowane nie dawniej niż tyle dni temu i niezmienione źródło → bez publikacji.
@@ -90,6 +98,8 @@ DEFAULT_TARGETS = [
     ["Warszawa Zachodnia"],
     ["Warszawa Centralna"],
 ]
+# Domyślne cele, których brak (bo brak kursów WKD) to tylko ostrzeżenie.
+OPTIONAL_TARGETS = {"Warszawa Śródmieście WKD"}
 
 FLAG_NO_PICKUP = 1
 FLAG_NO_DROP_OFF = 2
@@ -337,7 +347,7 @@ def assign_groups(stations: list[Station]) -> list[tuple[str, str, float]]:
     return pairs
 
 
-def resolve_default_targets(stations: list[Station]) -> list[list[int]]:
+def resolve_default_targets(stations: list[Station], warnings: list[str]) -> list[list[int]]:
     by_name: dict[str, list[Station]] = defaultdict(list)
     for s in stations:
         by_name[s.name].append(s)
@@ -346,6 +356,9 @@ def resolve_default_targets(stations: list[Station]) -> list[list[int]]:
         ids = []
         for name in group:
             found = by_name.get(name)
+            if not found and name in OPTIONAL_TARGETS:
+                warnings.append(f"Brak domyślnej stacji docelowej „{name}\" — pominięta")
+                continue
             if not found:
                 raise BuildError(f"Nie znaleziono domyślnej stacji docelowej „{name}\"")
             if len(found) > 1:
@@ -399,13 +412,16 @@ class BuildResult:
     db_path: Path
     meta: dict[str, str]
     platform_coverage: dict[str, float]
+    last_dates: dict[str, dt.date] = field(default_factory=dict)  # ostatni dzień kursów przewoźnika
+    warnings: list[str] = field(default_factory=list)  # braki WKD: publikujemy, ale z powiadomieniem
 
 
 def build_database(feed: Feed, today: dt.date, out_path: Path) -> BuildResult:
     stations = sorted(feed.stations.values(), key=lambda s: s.id)
     for a, b, d in assign_groups(stations):
         log.info("Grupa stacji: %s ↔ %s (%.0f m)", a, b, d)
-    targets = resolve_default_targets(stations)
+    warnings: list[str] = []
+    targets = resolve_default_targets(stations, warnings)
 
     trips = sorted(feed.trips, key=lambda t: (min(t.dates), t.agency, t.stop_times[0][3], t.train_no))
     valid_from = today - dt.timedelta(days=WINDOW_BEFORE_DAYS)
@@ -441,9 +457,16 @@ def build_database(feed: Feed, today: dt.date, out_path: Path) -> BuildResult:
             with_platform[t.agency] += sum(1 for st in rail if st[4])
 
         for agency in CARRIERS.values():
-            if agency not in last_date:
+            if agency in last_date:
+                continue
+            if agency in OPTIONAL_AGENCIES:
+                warnings.append(f"Brak kursów {agency} w oknie dat — rozkład bez {agency}")
+            else:
                 raise BuildError(f"Brak kursów przewoźnika {agency} w oknie dat")
-        valid_to = parse_date(str(min(last_date.values())))
+        last_dates = {a: parse_date(str(d)) for a, d in sorted(last_date.items(), key=lambda x: AGENCY_ORDER[x[0]])}
+        log.info("Ostatni dzień kursów: %s", ", ".join(f"{a} {d.isoformat()}" for a, d in last_dates.items()))
+        # Ważność wg przewoźników wymaganych — krótki horyzont WKD nie postarza danych na Karoo.
+        valid_to = min(d for a, d in last_dates.items() if a not in OPTIONAL_AGENCIES)
         meta = {
             "schema_version": str(SCHEMA_VERSION),
             "feed_version": f"pdp:{feed.feed_version}",
@@ -464,7 +487,7 @@ def build_database(feed: Feed, today: dt.date, out_path: Path) -> BuildResult:
     coverage = {a: (with_platform[a] / total[a] if total[a] else 0.0) for a in sorted(total)}
     for a, c in coverage.items():
         log.info("Pokrycie peronów %s: %.1f%% (%d postojów, bez ZKA)", a, c * 100, total[a])
-    return BuildResult(out_path, meta, coverage)
+    return BuildResult(out_path, meta, coverage, last_dates, warnings)
 
 
 def validate(result: BuildResult, today: dt.date) -> None:
@@ -484,9 +507,14 @@ def validate(result: BuildResult, today: dt.date) -> None:
                     raise BuildError(f"Stacja docelowa {sid} nie istnieje w bazie")
     finally:
         con.close()
-    valid_to = dt.date.fromisoformat(result.meta["valid_to"])
-    if valid_to < today + dt.timedelta(days=MIN_VALID_AHEAD_DAYS):
-        raise BuildError(f"valid_to {valid_to} < dziś+{MIN_VALID_AHEAD_DAYS}")
+    for agency, last in result.last_dates.items():
+        if agency in OPTIONAL_AGENCIES:
+            if last < today + dt.timedelta(days=OPTIONAL_MIN_VALID_AHEAD_DAYS):
+                result.warnings.append(f"{agency}: kursy tylko do {last} < dziś+{OPTIONAL_MIN_VALID_AHEAD_DAYS}")
+        elif last < today:
+            raise BuildError(f"{agency}: brak kursów na dziś (ostatnie {last})")
+        elif last < today + dt.timedelta(days=MIN_VALID_AHEAD_DAYS):
+            result.warnings.append(f"{agency}: kursy tylko do {last} < dziś+{MIN_VALID_AHEAD_DAYS} — rozkład okrojony")
     size = result.db_path.stat().st_size
     log.info("Rozmiar bazy: %.2f MB", size / 1e6)
     if size > MAX_DB_BYTES:
@@ -523,6 +551,9 @@ def write_outputs(result: BuildResult, out_dir: Path, sources: dict, today: dt.d
         "generated_at": result.meta["generated_at"],
         "valid_from": result.meta["valid_from"],
         "valid_to": result.meta["valid_to"],
+        # Ostatni dzień kursów każdego przewoźnika — do decyzji o przebudowie (WKD ma krótki
+        # horyzont, a nie wlicza się do `valid_to`). Aplikacja pole ignoruje.
+        "carriers_valid_to": {a: d.isoformat() for a, d in result.last_dates.items()},
         "sources": sources,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -590,8 +621,12 @@ def main(argv: list[str] | None = None) -> int:
         previous = json.loads(args.previous_manifest.read_text(encoding="utf-8"))
     stale = True
     if previous and previous.get("schema_version") == SCHEMA_VERSION:
-        prev_valid_to = dt.date.fromisoformat(previous["valid_to"])
-        stale = prev_valid_to < today + dt.timedelta(days=REBUILD_WHEN_VALID_AHEAD_BELOW_DAYS)
+        # Przebudowa także wtedy, gdy kończą się dane WKD albo ich brakowało — inaczej przy
+        # niezmienionej wersji w API ostrzeżenie o WKD przyszłoby tylko raz.
+        carriers = previous.get("carriers_valid_to") or {}
+        ends = [dt.date.fromisoformat(previous["valid_to"])] + [dt.date.fromisoformat(d) for d in carriers.values()]
+        stale = (set(carriers) != set(CARRIERS.values())
+                 or min(ends) < today + dt.timedelta(days=REBUILD_WHEN_VALID_AHEAD_BELOW_DAYS))
 
     tmp = Path(tempfile.mkdtemp(prefix="timetable-"))
     try:
@@ -613,8 +648,19 @@ def main(argv: list[str] | None = None) -> int:
         feed = load_feed(data, window)
         result = build_database(feed, today, tmp / "timetable.sqlite")
         validate(result, today)
-        write_outputs(result, args.out, sources, today)
-        set_output("publish", "true")
+        valid_to = dt.date.fromisoformat(result.meta["valid_to"])
+        prev_valid_to = dt.date.fromisoformat(previous["valid_to"]) if previous and previous.get("valid_to") else None
+        publish = True
+        if valid_to < today + dt.timedelta(days=MIN_VALID_AHEAD_DAYS) and prev_valid_to and prev_valid_to > valid_to:
+            # Okrojone dane krótsze od opublikowanych — zostaje poprzedni rozkład.
+            result.warnings.append(f"Zostaje poprzedni rozkład (do {prev_valid_to}), nowy tylko do {valid_to}")
+            publish = False
+        if publish:
+            write_outputs(result, args.out, sources, today)
+        set_output("publish", "true" if publish else "false")
+        for w in result.warnings:
+            log.warning("%s", w)
+        set_output("warnings", " | ".join(result.warnings))
         return 0
     except BuildError as e:
         log.error("Błąd danych, brak publikacji: %s", e)

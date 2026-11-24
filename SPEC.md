@@ -162,14 +162,16 @@ CREATE INDEX stop_time_station_dep ON stop_time(station_id, dep_s);
 Test pipeline'u sprawdza, że wszystkie zostały znalezione (uwaga na pomylenie „Warszawa Śródmieście" z „Warszawa Śródmieście WKD" — muszą być obie, w jednej grupie).
 
 ### 3.5 Publikacja
-- `manifest.json`: `{ schema_version, version, sha256, size_bytes, url, generated_at, valid_from, valid_to }`.
+- `manifest.json`: `{ schema_version, version, sha256, size_bytes, url, generated_at, valid_from, valid_to, carriers_valid_to, sources }` (`carriers_valid_to` — ostatni dzień kursów każdego przewoźnika; aplikacja go ignoruje).
 - Orphan `gh-pages`, force-push jednym commitem (`manifest.json` + aktualny plik danych). GitHub Pages serwuje pod stałym URL.
 - Atrybucja (warunki ponownego wykorzystania PKP PLK i Kolei Mazowieckich; WKD CC0) w `meta.source_attribution`, widoczna w aplikacji („O danych").
 - Cron: `30 1 * * *` (UTC) ≈ 02:30–03:30 w Warszawie.
 
 ### 3.6 Testy pipeline'u
 - Fixture GTFS: kurs po północy, wyjątek w `calendar_dates`, peron z `parent_station` i `platform_code`, autobus ZKA, kurs WKD, para stacji-bliźniaków.
-- Walidacja wyniku przed publikacją: niepuste tabele, domyślne cele znalezione, `valid_to ≥ dziś+7`, rozmiar < 10 MB, pokrycie peronów zalogowane. Błąd → brak publikacji (stary manifest zostaje).
+- Walidacja wyniku przed publikacją: niepuste tabele, domyślne cele znalezione, kursy KM, SKM i ŁKA co najmniej na dziś, rozmiar < 10 MB, pokrycie peronów zalogowane. Błąd → brak publikacji (stary manifest zostaje).
+- **Rozkład okrojony** (od 24.11.2026): kursy KM, SKM lub ŁKA krótsze niż dziś+7 to ostrzeżenie — publikujemy, chyba że poprzednio opublikowany rozkład sięga dalej (wtedy zostaje on). Ostrzeżenia (też WKD, niżej) kończą workflow błędem po publikacji → powiadomienie mailem z GitHub.
+- **WKD na ostateczność** (od 24.11.2026): brak kursów WKD, kursy WKD krótsze niż dziś+3 (WKD publikuje w API tylko ~tydzień naprzód) lub brak stacji „Warszawa Śródmieście WKD" to ostrzeżenie, nie błąd — rozkład się publikuje. `valid_to` liczone tylko z KM, SKM i ŁKA; przebudowa także przy niezmienionej wersji w API, gdy dane WKD się kończą (`carriers_valid_to` < dziś+12) lub ich brakowało.
 
 ---
 

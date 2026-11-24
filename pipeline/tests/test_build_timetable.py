@@ -267,12 +267,123 @@ def test_meta_and_manifest(built):
     assert manifest["size_bytes"] == gz.stat().st_size
     assert manifest["version"].startswith("20261026-")
     assert manifest["valid_to"] == meta["valid_to"]
+    assert manifest["carriers_valid_to"] == {"KM": "2026-11-09", "SKM": "2026-11-05", "LKA": "2026-11-03", "WKD": "2026-11-04"}
     assert con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
-def test_short_validity_fails(schedules, tmp_path):
-    route(schedules, 1004)["od"] = ["2026-10-30"]  # ŁKA tylko do 30.10
-    route(schedules, 1005)["od"] = ["2026-10-26"]
+def lka_until(schedules, last: str) -> None:
+    route(schedules, 1004)["od"] = [last]
+    route(schedules, 1005)["od"] = ["2026-10-25"]
+
+
+def prev_manifest(tmp_path, valid_to: str) -> str:
+    prev = tmp_path / "prev.json"
+    prev.write_text(json.dumps({"schema_version": 1, "valid_to": valid_to}), encoding="utf-8")
+    return str(prev)
+
+
+def test_short_required_carrier_publishes_truncated(schedules, tmp_path, gh_output):
+    lka_until(schedules, "2026-10-30")  # ŁKA tylko do dziś+4
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out) == 0
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["valid_to"] == "2026-10-30"
+    o = outputs(gh_output)
+    assert o["publish"] == "true"
+    assert o["warnings"] == "LKA: kursy tylko do 2026-10-30 < dziś+7 — rozkład okrojony"
+
+
+def test_truncated_today_only_still_publishes(schedules, tmp_path, gh_output):
+    lka_until(schedules, "2026-10-26")  # tylko dziś
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out) == 0
+    assert json.loads((out / "manifest.json").read_text(encoding="utf-8"))["valid_to"] == "2026-10-26"
+
+
+def test_required_carrier_without_today_fails(schedules, tmp_path):
+    lka_until(schedules, "2026-10-25")  # tylko wczoraj
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out) == 1
+    assert not (out / "manifest.json").exists()
+
+
+def test_truncated_keeps_longer_previous(schedules, tmp_path, gh_output):
+    lka_until(schedules, "2026-10-30")
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out, "--previous-manifest", prev_manifest(tmp_path, "2026-11-01")) == 0
+    assert not (out / "manifest.json").exists()
+    o = outputs(gh_output)
+    assert o["publish"] == "false"
+    assert "Zostaje poprzedni rozkład (do 2026-11-01), nowy tylko do 2026-10-30" in o["warnings"]
+
+
+def test_truncated_replaces_shorter_previous(schedules, tmp_path, gh_output):
+    lka_until(schedules, "2026-10-30")
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out, "--previous-manifest", prev_manifest(tmp_path, "2026-10-28")) == 0
+    assert (out / "manifest.json").exists()
+    assert outputs(gh_output)["publish"] == "true"
+
+
+def wkd_until(schedules, last: str) -> None:
+    for oid in (2001, 2002):
+        route(schedules, oid)["od"] = [d for d in route(schedules, oid)["od"] if d <= last]
+    route(schedules, 2002)["od"].append(last)
+
+
+def outputs(path: Path) -> dict[str, str]:
+    return dict(line.split("=", 1) for line in path.read_text(encoding="utf-8").splitlines())
+
+
+@pytest.fixture
+def gh_output(monkeypatch, tmp_path):
+    path = tmp_path / "github_output"
+    path.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(path))
+    return path
+
+
+def test_wkd_week_ahead_publishes_without_warning(schedules, tmp_path, caplog, gh_output):
+    # 24.11.2026: WKD w API tylko do dziś+6, reszta do dziś+14 — rozkład ma się opublikować.
+    caplog.set_level("INFO", logger="build_timetable")
+    wkd_until(schedules, "2026-11-01")
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out) == 0
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["valid_to"] == "2026-11-03"  # wg KM/SKM/ŁKA — WKD nie postarza danych
+    assert "WKD 2026-11-01" in caplog.text
+    assert outputs(gh_output) == {"publish": "true", "warnings": ""}
+
+
+def test_wkd_short_publishes_with_warning(schedules, tmp_path, gh_output):
+    wkd_until(schedules, "2026-10-28")  # dziś+2
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out) == 0
+    assert (out / "manifest.json").exists()
+    o = outputs(gh_output)
+    assert o["publish"] == "true"
+    assert o["warnings"] == "WKD: kursy tylko do 2026-10-28 < dziś+3"
+
+
+def test_missing_wkd_publishes_with_warning(schedules, tmp_path, gh_output):
+    schedules["rt"] = [r for r in schedules["rt"] if r["cc"] != "WKD"]
+    out = tmp_path / "out"
+    assert run(schedules, tmp_path, out) == 0
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    db = tmp_path / "db.sqlite"
+    db.write_bytes(gzip.decompress((out / manifest["url"]).read_bytes()))
+    con = sqlite3.connect(db)
+    meta = dict(con.execute("SELECT key, value FROM meta").fetchall())
+    assert {r[0] for r in con.execute("SELECT DISTINCT agency FROM trip")} == {"KM", "SKM", "LKA"}
+    con.close()
+    assert json.loads(meta["default_targets"]) == [[36103], [37440], [33571], [33506], [33605]]
+    warnings = outputs(gh_output)["warnings"].split(" | ")
+    assert "Brak kursów WKD w oknie dat — rozkład bez WKD" in warnings
+    assert any("Warszawa Śródmieście WKD" in w for w in warnings)
+
+
+def test_required_target_still_mandatory(schedules, tmp_path):
+    schedules["dc"]["st"]["33571"]["nm"] = "Gdańsk Główny"  # Warszawa Śródmieście
     assert run(schedules, tmp_path, tmp_path / "out") == 1
 
 
@@ -320,9 +431,12 @@ def test_api_build_sends_key_only_in_header(fake_api, tmp_path, caplog):
     assert manifest["sources"] == {"pdp": {"schedules_version": "v-1"}}
 
 
+FRESH = {"KM": "2026-11-09", "SKM": "2026-11-09", "LKA": "2026-11-09", "WKD": "2026-11-09"}
+
+
 def test_api_unchanged_version_skips_build(fake_api, tmp_path):
     prev = tmp_path / "prev.json"
-    prev.write_text(json.dumps({"schema_version": 1, "valid_to": "2026-11-09",
+    prev.write_text(json.dumps({"schema_version": 1, "valid_to": "2026-11-09", "carriers_valid_to": FRESH,
                                 "sources": {"pdp": {"schedules_version": "v-1"}}}), encoding="utf-8")
     out = tmp_path / "out"
     assert bt.main(["--out", str(out), "--today", TODAY.isoformat(), "--previous-manifest", str(prev)]) == 0
@@ -334,6 +448,22 @@ def test_api_unchanged_but_stale_rebuilds(fake_api, tmp_path):
     prev = tmp_path / "prev.json"
     prev.write_text(json.dumps({"schema_version": 1, "valid_to": "2026-11-03",
                                 "sources": {"pdp": {"schedules_version": "v-1"}}}), encoding="utf-8")
+    out = tmp_path / "out"
+    assert bt.main(["--out", str(out), "--today", TODAY.isoformat(), "--previous-manifest", str(prev)]) == 0
+    assert (out / "manifest.json").exists()
+
+
+@pytest.mark.parametrize("carriers", [
+    {**FRESH, "WKD": "2026-11-02"},                   # dane WKD się kończą (dziś+7 < dziś+12)
+    {k: v for k, v in FRESH.items() if k != "WKD"},  # poprzednio bez WKD
+    None,                                            # manifest sprzed tego pola
+])
+def test_api_unchanged_but_wkd_ending_rebuilds(fake_api, tmp_path, carriers):
+    prev = tmp_path / "prev.json"
+    m = {"schema_version": 1, "valid_to": "2026-11-09", "sources": {"pdp": {"schedules_version": "v-1"}}}
+    if carriers is not None:
+        m["carriers_valid_to"] = carriers
+    prev.write_text(json.dumps(m), encoding="utf-8")
     out = tmp_path / "out"
     assert bt.main(["--out", str(out), "--today", TODAY.isoformat(), "--previous-manifest", str(prev)]) == 0
     assert (out / "manifest.json").exists()
