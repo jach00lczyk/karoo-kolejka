@@ -72,3 +72,19 @@ jobs:
           git add -A
           git commit -q -m "Rozkład $(jq -r .version manifest.json)"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+
+      # Braki WKD i okrojony rozkład KM/SKM/ŁKA nie blokują publikacji, ale właściciel chce o nich
+      # wiedzieć: rozkład jest już opublikowany (albo zostaje poprzedni, dłuższy), a czerwony
+      # przebieg daje powiadomienie mailem z GitHub.
+      - name: Powiadomienie o brakach w danych
+        if: steps.build.outputs.warnings != ''
+        env:
+          WARNINGS: ${{ steps.build.outputs.warnings }}
+        run: |
+          echo "::warning title=Braki w danych rozkładu::$WARNINGS"
+          {
+            echo "### Braki w danych rozkładu (publikacja: ${{ steps.build.outputs.publish }})"
+            echo
+            echo "$WARNINGS" | tr '|' '\n' | sed 's/^ */- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

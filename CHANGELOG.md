@@ -2,7 +2,25 @@
 
 ## [Unreleased]
 
-## [0.3.1] — 2026-11-11
+### Rozkład: WKD na ostateczność, okrojony rozkład zamiast żadnego (2026-11-24)
+
+- **Błąd: nocny build 24.11 nie opublikował rozkładu** („valid_to 2026-11-30 < dziś+7").
+  WKD ma w API PDP zamówienie na każdy dzień i publikuje je tylko ~tydzień naprzód (24.11:
+  kursy do 30.11), a walidacja wymagała dziś+7 od najkrócej opisanego przewoźnika — przez WKD
+  przepadały też świeże dane KM, SKM i ŁKA (do 8.12).
+- WKD jest teraz opcjonalna (właściciel nią nie jeździ): brak kursów WKD, kursy WKD krótsze niż
+  dziś+3 albo brak stacji „Warszawa Śródmieście WKD" dają ostrzeżenie zamiast błędu. Rozkład się
+  publikuje (domyślny cel Śródmieście wtedy bez bliźniaka WKD), a ostatni krok workflow kończy
+  się błędem z opisem braków — powiadomienie mailem z GitHub.
+- KM, SKM i ŁKA krótsze niż dziś+7 też nie blokują publikacji: rozkład „okrojony" wychodzi
+  z ostrzeżeniem, byle był przynajmniej na dziś i nie krótszy od poprzednio opublikowanego
+  (wtedy zostaje poprzedni, także z powiadomieniem). Błędem zostaje brak kursów na dziś lub
+  brak przewoźnika KM/SKM/ŁKA w ogóle.
+- `valid_to` liczone tylko z KM, SKM i ŁKA, więc krótki horyzont WKD nie oznacza danych na Karoo
+  jako nieaktualnych. Nowe pole manifestu `carriers_valid_to` (ostatni dzień każdego
+  przewoźnika; aplikacja go ignoruje) — build rusza mimo niezmienionej wersji w API, gdy dane
+  WKD się kończą lub ich brakowało, więc ostrzeżenie powtarza się, dopóki problem trwa.
+- Log builda podaje ostatni dzień kursów każdego przewoźnika. +11 testów pipeline'u (42).
 
 ### Opóźnienia dla wszystkich pociągów z kafelka (2026-11-11)
 
