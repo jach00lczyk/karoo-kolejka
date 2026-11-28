@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "version": "20261128-c7f7c5a8",
+  "sha256": "b507bb573a4ea6d1218a029c160ab7464e76f82bab86850c589d8f4ece28b0d0",
+  "size_bytes": 1189830,
+  "url": "timetable-20261128-c7f7c5a8.sqlite.gz",
+  "generated_at": "2026-11-28T09:16:22+00:00",
+  "valid_from": "2026-11-27",
+  "valid_to": "2026-12-12",
+  "carriers_valid_to": {
+    "KM": "2026-12-12",
+    "SKM": "2026-12-12",
+    "LKA": "2026-12-12",
+    "WKD": "2026-11-30"
+  },
+  "sources": {
+    "pdp": {
+      "schedules_version": "cc04b08c-2398-4721-b408-5a58211ca93a"
+    }
+  }
+}
